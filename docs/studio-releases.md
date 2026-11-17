@@ -24,7 +24,8 @@ Python/Studio、Vue、真实 Linux 远程运行和四个平台的客户端构建
 3. 手动运行 **Release Studio clients**，分支仍选择 `main`，`tag` 填
    `studio-v<包版本>`，例如包版本 `0.5.7` 对应 `studio-v0.5.7`。
 4. 发布流程检查分支、版本和该提交的完整 CI 记录，再创建绑定源码 SHA 的 Release 草稿。
-   已有标签指向其他提交，或已有同名 Release 时拒绝创建，不覆盖既有版本。
+   GitHub 自动列出自上个版本以来合并的 PR，首版列出仓库首次发布前合并的 PR。
+   草稿说明保留源码 SHA 和校验记录说明。已有标签指向其他提交，或已有同名 Release 时拒绝创建。
 5. 在 Windows x64、macOS arm64、macOS x86_64 和 Ubuntu x64 分别使用与 PR
    相同的打包流程，完成冻结运行时检查、平台安装包和 SHA-256/协议记录。
 6. 各平台直接上传到该源码的草稿，不经过 Actions artifact 存储。最终作业下载并
@@ -32,7 +33,7 @@ Python/Studio、Vue、真实 Linux 远程运行和四个平台的客户端构建
 
 公开 Release 包含四个安装包、四个同名 `.json` 记录及一个完整 `manifest.json`。
 单个资产须小于 2 GiB；该限制与 Actions 的存储额度是不同的规则。
-发布说明包含源码提交；不使用浮动分支名标记安装包来源。
+要查找某项改动，请在对应版本的发布说明中查看该 PR 的链接。
 
 ## 3. 失败、容量与重跑
 
@@ -57,4 +58,5 @@ Python/Studio、Vue、真实 Linux 远程运行和四个平台的客户端构建
 
 依据：[Release 大小限制](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases#storage-and-bandwidth-quotas)、
 [Actions 存储计费](https://docs.github.com/en/billing/concepts/product-billing/github-actions)、
-[GitHub CLI 发布命令](https://cli.github.com/manual/gh_release_create)。
+[GitHub CLI 发布命令](https://cli.github.com/manual/gh_release_create)、
+[GitHub 自动生成发布说明](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes)。

@@ -1,10 +1,13 @@
 """Publication requires a verified source, an owned draft and complete installer records."""
 
+import json
 import runpy
+import subprocess
 from pathlib import Path
 
 import pytest
 
+from ci import studio_release
 from ci.studio_release import PLATFORMS, require_draft, require_source, verify_packages
 
 
@@ -34,6 +37,35 @@ def test_release_requires_the_complete_gate_for_its_exact_source(change):
 def test_release_rejects_a_different_version_or_branch(tag, ref):
     with pytest.raises(ValueError):
         require_source(tag, '0.5.7', ref, SHA, [gate()])
+
+
+def test_prepare_release_requests_merged_pull_requests_in_the_source_bound_draft(tmp_path, monkeypatch):
+    repository = 'example/TigerBrowser'
+    project = tmp_path / 'pythonlib'
+    project.mkdir()
+    (project / 'pyproject.toml').write_text('[tool.poetry]\nversion = "0.5.7"\n', encoding='utf-8')
+    github_output = tmp_path / 'output'
+    for key, value in {'GITHUB_SHA': SHA, 'GITHUB_REF': 'refs/heads/main',
+                       'GITHUB_REPOSITORY': repository, 'GITHUB_OUTPUT': str(github_output)}.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(studio_release, 'ROOT', tmp_path)
+    monkeypatch.setattr('sys.argv', ['studio_release', 'prepare', '--tag', TAG])
+    monkeypatch.setattr(subprocess, 'check_output', lambda *args, **kwargs: json.dumps([{'check_runs': [gate()]}]))
+
+    def run(command, **kwargs):
+        if command[0] == 'git':
+            return subprocess.CompletedProcess(command, 1)
+        assert command[:4] == ['gh', 'release', 'create', TAG]
+        assert command[command.index('--target') + 1] == SHA
+        assert '--draft' in command
+        assert '--generate-notes' in command
+        notes = command[command.index('--notes') + 1]
+        assert SHA in notes and 'SHA-256' in notes
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(subprocess, 'run', run)
+    studio_release.main()
+    assert github_output.read_text(encoding='utf-8').startswith('matrix=')
 
 
 @pytest.mark.parametrize('change', [{}, {'isDraft': False}, {'tagName': 'studio-v0.5.6'},

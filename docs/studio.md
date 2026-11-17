@@ -228,7 +228,9 @@ distributions and dependency licenses (license directories and conventional
 text notices, not similarly named test binaries), runs the frozen client's
 `--check-runtime` (QtWebEngine, the WebChannel script, the native credential
 backend, the bundled model and runtime paths) and, on Windows, checks both
-executable subsystem headers. It writes the installer and a `.json` record
+executable subsystem headers. On macOS it copies the app to a private staging
+volume, verifies the copied bundle's code signature, detaches the volume and
+verifies the final compressed disk image. It writes the installer and a `.json` record
 with its version, platform, size, SHA-256 and protocol range. Pull requests and
 full CI runs build and verify all four platforms without storing Actions artifacts.
 [Staged validation](../ci/README.md#staged-cloud-validation) can run Windows/Ubuntu

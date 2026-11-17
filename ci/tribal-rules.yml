@@ -44,13 +44,15 @@ rules:
       - "ci/tests/test_workflows.py: artifact-free source checks retain the full four-platform gate and share the release packager"
       - "ci/tests/test_studio_release.py: exact-source CI, draft ownership and complete digest-verified platform sets"
       - "docs/studio-releases.md: publication rules, capacity handling and explicit source-only updates"
+      - "https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes: merged pull requests in generated notes"
     rationale: >-
       Artifact quota cannot become a dependency of code verification. Source jobs
       build their own locked frontend and retain all four native installer checks
       without uploading Actions artifacts. Only an explicit release workflow may
-      write a source-bound draft. Every platform and downloaded digest must verify
-      before publication; failed or unavailable publication leaves source updates
-      independent, never a fabricated successful release or a raised spending limit.
+      write a source-bound draft listing the PRs merged for that version. Every
+      platform and downloaded digest must verify before publication. Failed or
+      unavailable publication leaves source updates independent, never a fabricated
+      successful release or a raised spending limit.
 
   # -------------------------------------------------------------------------
   # Virtual display
@@ -839,6 +841,22 @@ rules:
       extension bound to an incompatible ABI. Build the dependency statically,
       as upstream wheels do, instead of replacing a bundled library after freezing.
       Every platform retains the frozen runtime check before installer creation.
+
+  - id: studio-macos-dmg-owns-its-staging-mount
+    title: macOS DMGs detach a private staging volume before compression
+    check: manual
+    evidence:
+      - "https://github.com/zhaotianshi/TigerBrowser/actions/runs/44008550638/job/133791652474: the frozen Apple Silicon app passed but hdiutil create -srcfolder failed with Resource busy"
+      - "https://keith.github.io/xcode-man-pages/hdiutil.1.html: attach with a private mountpoint, detach ignores open files with -force, and verify checks compressed images"
+      - "https://keith.github.io/xcode-man-pages/ditto.1.html: recursive copies preserve links and macOS metadata"
+      - "pythonlib/tests/test_studio_packaging.py: a busy implicit mount fails, and a failed copy detaches the private volume without publishing an image"
+    rationale: >-
+      The one-shot folder-to-image operation controls its implicit mount, so a
+      runner process with an open file can make it fail after copying. Mount a
+      sparse HFS+ image inside the build's private directory, copy with ditto
+      and verify the copied app signature before detaching that mount. Convert
+      only the detached image and verify the compressed DMG. Never retry the
+      implicit mount or change any host-wide settings.
 
   - id: studio-systemd-keyring-is-persistent-and-fails-closed
     title: The non-login server account unlocks a private native keyring before serving requests

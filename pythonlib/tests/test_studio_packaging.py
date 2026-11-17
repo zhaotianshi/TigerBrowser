@@ -4,6 +4,8 @@ import ast
 import os
 import re
 import runpy
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -67,3 +69,68 @@ def test_dependency_licenses_exclude_copying_test_binaries(monkeypatch, tmp_path
     stage(runtime)
     copied = runtime / 'licenses/example'
     assert {file.relative_to(copied).as_posix() for file in copied.rglob('*') if file.is_file()} == set(licenses)
+
+
+@pytest.mark.parametrize('copy_fails', [False, True])
+def test_macos_image_owns_and_detaches_its_staging_volume(monkeypatch, tmp_path, copy_fails):
+    script = Path(__file__).resolve().parents[2] / 'scripts/package-studio.py'
+    package = runpy.run_path(str(script))['macos_image']
+    dist = tmp_path / 'app'
+    app = dist / 'TigerBrowser.app'
+    app.mkdir(parents=True)
+    (app / 'signed-payload').write_bytes(b'original')
+    name = 'TigerBrowser.dmg'
+    attached = None
+    links = {}
+    checks = []
+
+    def command(args, **kwargs):
+        nonlocal attached
+        assert kwargs['check']
+        if args[:2] == ['hdiutil', 'create']:
+            if '-srcfolder' in args:
+                raise subprocess.CalledProcessError(1, args, stderr='Resource busy')
+            Path(args[-1]).touch()
+        elif args[:2] == ['hdiutil', 'attach']:
+            attached = Path(args[args.index('-mountpoint') + 1])
+            assert attached.resolve().is_relative_to(tmp_path.resolve()) and attached != tmp_path
+            assert '-nobrowse' in args and '-noautoopen' in args
+        elif args[0] == 'ditto':
+            if copy_fails:
+                raise subprocess.CalledProcessError(1, args, stderr='Copy failed')
+            shutil.copytree(args[-2], args[-1])
+        elif args[0] == 'codesign':
+            assert (Path(args[-1]) / 'signed-payload').read_bytes() == b'original'
+            assert Path(args[-1]).parent == attached
+            assert links == {attached / 'Applications': '/Applications'}
+            checks.append('signature')
+        elif args[:2] == ['hdiutil', 'detach']:
+            assert Path(args[2]) == attached
+            if (mounted_app := attached / app.name).is_dir():
+                (mounted_app / 'signed-payload').unlink()
+                mounted_app.rmdir()
+            attached = None
+            checks.append('detached')
+        elif args[:2] == ['hdiutil', 'convert']:
+            assert attached is None
+            assert '-format' in args and args[args.index('-format') + 1] == 'UDZO'
+            (tmp_path / name).write_bytes(b'compressed')
+        elif args[:2] == ['hdiutil', 'verify']:
+            assert Path(args[-1]).read_bytes() == b'compressed'
+            checks.append('image')
+
+    runner = SimpleNamespace(run=command, check_output=lambda *_args, **_kwargs: '1024\tapp')
+    monkeypatch.setitem(package.__globals__, 'subprocess', runner)
+    monkeypatch.setattr(Path, 'is_mount', lambda path: path == attached)
+    monkeypatch.setattr(Path, 'symlink_to', lambda path, target: links.setdefault(path, target))
+    if copy_fails:
+        with pytest.raises(subprocess.CalledProcessError, match='ditto'):
+            package(dist, tmp_path, name)
+        assert checks == ['detached']
+        assert not (tmp_path / name).exists()
+    else:
+        package(dist, tmp_path, name)
+        assert checks == ['signature', 'detached', 'image']
+        assert list(tmp_path.rglob('*.sparseimage')) == []
+    assert attached is None
+    assert (app / 'signed-payload').read_bytes() == b'original'

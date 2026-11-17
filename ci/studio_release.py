@@ -70,7 +70,7 @@ def main():
                                   capture_output=True, text=True)
         if existing.returncode == 0 and existing.stdout.strip() != sha:
             raise ValueError('Existing tag belongs to a different source commit.')
-        subprocess.run(['gh', 'release', 'create', tag, '--target', sha, '--draft',
+        subprocess.run(['gh', 'release', 'create', tag, '--target', sha, '--draft', '--generate-notes',
                         '--title', f'TigerBrowser {version}', '--notes',
                         f'Client installers for source {sha}. Each installer has a SHA-256/protocol record.'], check=True)
         matrix = {'include': [{'platform': platform, 'runner': runner} for platform, runner in PLATFORMS.items()]}

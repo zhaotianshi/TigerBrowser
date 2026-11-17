@@ -208,8 +208,10 @@ together; Python tests verify the canonical LF source digest.
 Client packaging uses `scripts/package-studio.py` on each target platform with the
 locked prerequisites in `docs/studio.md#client-packages`; CI builds all four
 without Actions artifact storage. Formal delivery follows `docs/studio-releases.md`:
-source updates and installer publication are separate, and capacity shortages defer
-publication rather than block verified source or authorize spending changes.
+each official GitHub Release lists the merged PRs for that version and includes all
+four client installers. Source updates and installer publication are separate.
+Capacity shortages defer publication rather than block verified source or authorize
+spending changes.
 `service-tester/studio_*_tests.py` uses actual browsers and native resources;
 follow its README and platform prerequisites. Missing prerequisites fail.
 
