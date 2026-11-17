@@ -53,12 +53,9 @@ function openEditModal() {
   }
 }
 
-function openDetailsModal(profile?: ProfileSummary) {
-  const target = profile || profilesStore.singleSelectedProfile
-  if (target) {
-    detailsProfileId.value = target.id
-    showDetailsModal.value = true
-  }
+function openDetailsModal(profile: ProfileSummary) {
+  detailsProfileId.value = profile.id
+  showDetailsModal.value = true
 }
 
 function openDeleteModal() {

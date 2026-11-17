@@ -1,3 +1,25 @@
+TigerBrowser Desktop Client
+English / 简体中文见下方
+
+Connect to a TigerBrowser team server. On first launch, use the exact address
+configured by the server's --origin option, then sign in with your member account.
+
+Installation:
+- Windows 10/11 x64: run the .exe installer. It installs for the current user at
+  %LOCALAPPDATA%\Programs\TigerBrowser without administrator rights.
+- macOS: open the .dmg and drag TigerBrowser.app to Applications.
+- Ubuntu 24.04 x64: open the .deb in the software installer or install it with apt.
+
+The desktop displays the console provided by the team server. Update the server
+to apply fixes to the web console. With permission to run a profile locally,
+select it and choose 本机启动 (Run Locally). Close the browser or choose 停止本机
+(Stop Local Run) to return the profile to the server.
+
+TigerBrowser stores the local profile cache and settings in the user's data
+directory. Proxy passwords use the operating system's credential store.
+
+Source, documentation and license: https://github.com/zhaotianshi/TigerBrowser
+
 TigerBrowser 桌面客户端
 
 本程序是 TigerBrowser 团队服务器的桌面客户端，必须连接服务器使用，不提供独立本机模式。

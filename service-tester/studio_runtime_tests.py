@@ -302,6 +302,22 @@ async def test_web_console_recovers_after_service_restart(workspace, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_console_opens_selected_profile_details(workspace, tmp_path):
+    store, _, _, profile = workspace
+    async with running_team(store) as (_, origin), console_client(store, tmp_path / 'client') as page:
+        await console_login(page, origin)
+        row = page.locator('.profile-table tbody tr').filter(has_text=profile['name'])
+        await row.get_by_role('checkbox').check()
+        await page.get_by_role('button', name='详情', exact=True).click()
+        modal = page.locator('.modal-container').filter(has_text='环境详情与指纹检查')
+        await expect(modal.get_by_text(profile['id'], exact=True)).to_be_visible()
+        await expect(modal.get_by_text(profile['name'], exact=True)).to_be_visible()
+        await modal.get_by_role('button', name='确定', exact=True).click()
+        await row.get_by_role('button', name=profile['name'], exact=True).click()
+        await expect(modal.get_by_text(profile['id'], exact=True)).to_be_visible()
+
+
+@pytest.mark.asyncio
 async def test_console_settings_and_timezone_choices_preserve_saved_values(workspace, tmp_path):
     store, _, _, profile = workspace
     proxy = store.save_proxy({'name': 'Synthetic timezone route', 'server': 'socks5://127.0.0.1:1080'})

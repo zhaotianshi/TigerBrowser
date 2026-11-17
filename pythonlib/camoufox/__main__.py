@@ -1090,13 +1090,13 @@ def path_cmd():
 @click.option("--cache-dir", type=click.Path(file_okay=False, path_type=Path),
               help="Independent client cache instead of the per-user data directory.")
 def studio_cmd(cache_dir):
-    """Open the desktop client for a Studio team server."""
+    """Open the TigerBrowser desktop client."""
     try:
         from .studio.client.shell import main
     except ModuleNotFoundError as error:
         if error.name not in ('PySide6', 'keyring', 'tzdata'):
             raise
-        raise click.ClickException("Studio requires the studio extra: pip install -e './pythonlib[studio]'") from error
+        raise click.ClickException("TigerBrowser requires the studio extra: pip install -e './pythonlib[studio]'") from error
     raise SystemExit(main(cache_dir))
 
 

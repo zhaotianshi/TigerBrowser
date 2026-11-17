@@ -49,7 +49,7 @@ def desktop_argument(value):
 def desktop_entry(root):
     command = ' '.join(desktop_argument(part) for part in ('/bin/bash', root / 'start-studio.sh'))
     return ('[Desktop Entry]\nType=Application\nVersion=1.0\n'
-            'Name=TigerBrowser\nComment=Manage persistent Camoufox browser environments\n'
+            'Name=TigerBrowser\nComment=Manage persistent browser environments\n'
             f'Exec={command}\nPath={desktop_value(root)}\n'
             f'Icon={desktop_value(root / "assets/studio/default128.png")}\n'
             'Terminal=false\nCategories=Network;WebBrowser;\nStartupNotify=true\n')
