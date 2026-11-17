@@ -1,0 +1,14 @@
+name: Build Studio frontend
+description: Build the locked Vue console in the current job without artifact storage
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: frontend/studio/package-lock.json
+    - run: npm --prefix frontend/studio ci
+      shell: bash
+    - run: npm --prefix frontend/studio run build
+      shell: bash

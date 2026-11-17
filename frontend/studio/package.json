@@ -1,0 +1,28 @@
+{
+  "name": "@camoufox/studio-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "build:probe": "node scripts/build-native-probe.mjs"
+  },
+  "dependencies": {
+    "lucide-vue-next": "^0.475.0",
+    "pinia": "^3.0.1",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "@types/node": "^22.13.9",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.7",
+    "vue-tsc": "^2.2.8"
+  }
+}

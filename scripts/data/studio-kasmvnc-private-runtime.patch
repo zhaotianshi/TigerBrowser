@@ -1,0 +1,163 @@
+diff --git a/common/network/PrivateSocket.h b/common/network/PrivateSocket.h
+new file mode 100644
+index 0000000..e3ad879
+--- /dev/null
++++ b/common/network/PrivateSocket.h
+@@ -0,0 +1,23 @@
++/* Studio uses a private /tmp mount for each display.
++ * Keep this IPC in that mount when PID namespaces reuse process numbers.
++ * This modification is distributed under KasmVNC's GPL-2.0-or-later license.
++ */
++#ifndef KASMVNC_PRIVATE_SOCKET_H
++#define KASMVNC_PRIVATE_SOCKET_H
++
++#include <stddef.h>
++#include <stdio.h>
++#include <string.h>
++#include <sys/socket.h>
++#include <sys/un.h>
++
++static inline socklen_t kasm_private_socket_address(struct sockaddr_un *addr,
++                                                   unsigned int pid)
++{
++    memset(addr, 0, sizeof(*addr));
++    addr->sun_family = AF_UNIX;
++    snprintf(addr->sun_path, sizeof(addr->sun_path), "/tmp/.KasmVNCSock%u", pid);
++    return offsetof(struct sockaddr_un, sun_path) + strlen(addr->sun_path) + 1;
++}
++
++#endif
+diff --git a/common/network/TcpSocket.cxx b/common/network/TcpSocket.cxx
+index 9663724..595d493 100644
+--- a/common/network/TcpSocket.cxx
++++ b/common/network/TcpSocket.cxx
+@@ -46,6 +46,7 @@
+ #include <openssl/err.h>
+ #include <openssl/ssl.h>
+ #include "websocket.h"
++#include "PrivateSocket.h"
+ 
+ #include <network/GetAPI.h>
+ #include <network/TcpSocket.h>
+@@ -657,16 +658,11 @@ WebsocketListener::WebsocketListener(const struct sockaddr *listenaddr,
+   //
+   internalSocket = socket(AF_UNIX, SOCK_STREAM, 0);
+ 
+-  char sockname[32];
+-  sprintf(sockname, ".KasmVNCSock%u", getpid());
+-
+   struct sockaddr_un addr;
+-  addr.sun_family = AF_UNIX;
+-  strcpy(addr.sun_path, sockname);
+-  addr.sun_path[0] = '\0';
++  socklen_t addrlen = kasm_private_socket_address(&addr, getpid());
+ 
+   if (bind(internalSocket, (struct sockaddr *) &addr,
+-           sizeof(sa_family_t) + strlen(sockname))) {
++           addrlen)) {
+     throw SocketException("failed to bind socket", errorNumber);
+   }
+ 
+@@ -719,12 +715,7 @@ WebsocketListener::WebsocketListener(const struct sockaddr *listenaddr,
+   pthread_t tid;
+   pthread_create(&tid, NULL, start_server, NULL);
+ 
+-  uint16_t *nport = (uint16_t *) calloc(1, sizeof(uint16_t));
+-  if (rfb::Server::udpPort)
+-    *nport = rfb::Server::udpPort;
+-  else
+-    *nport = ntohs(sa.u.sin.sin_port);
+-  pthread_create(&tid, NULL, udpserver, nport);
++
+ }
+ 
+ Socket* WebsocketListener::createSocket(int fd) {
+diff --git a/common/network/websockify.c b/common/network/websockify.c
+index f0a322a..7c32c2a 100644
+--- a/common/network/websockify.c
++++ b/common/network/websockify.c
+@@ -23,6 +23,7 @@
+ #include <sys/time.h>
+ #include <sys/types.h>
+ #include "websocket.h"
++#include "PrivateSocket.h"
+ 
+ /*
+ char USAGE[] = "Usage: [options] " \
+@@ -227,13 +228,8 @@ static void do_proxy(ws_ctx_t *ws_ctx, int target) {
+ 
+ void proxy_handler(ws_ctx_t *ws_ctx) {
+ 
+-    char sockname[32];
+-    sprintf(sockname, ".KasmVNCSock%u", getpid());
+-
+     struct sockaddr_un addr;
+-    addr.sun_family = AF_UNIX;
+-    strcpy(addr.sun_path, sockname);
+-    addr.sun_path[0] = '\0';
++    socklen_t addrlen = kasm_private_socket_address(&addr, getpid());
+ 
+     struct timeval tv;
+     gettimeofday(&tv, NULL);
+@@ -250,7 +246,7 @@ void proxy_handler(ws_ctx_t *ws_ctx) {
+     handler_msg("connecting to VNC target\n");
+ 
+     if (connect(tsock, (struct sockaddr *) &addr,
+-        sizeof(sa_family_t) + strlen(sockname)) < 0) {
++        addrlen) < 0) {
+ 
+         handler_emsg("Could not connect to target: %s\n",
+                      strerror(errno));
+diff --git a/common/rfb/SMsgReader.cxx b/common/rfb/SMsgReader.cxx
+index f1a8e9f..27f8386 100644
+--- a/common/rfb/SMsgReader.cxx
++++ b/common/rfb/SMsgReader.cxx
+@@ -17,7 +17,6 @@
+  * USA.
+  */
+ #include <stdio.h>
+-#include <network/Udp.h>
+ #include <rdr/InStream.h>
+ #include <rdr/ZlibInStream.h>
+ 
+@@ -355,26 +354,7 @@ void SMsgReader::readQEMUKeyEvent()
+ 
+ void SMsgReader::readUpgradeToUdp()
+ {
+-  char buf[4096], resp[4096];
+-  rdr::U16 len = is->readU16();
+-
+-  if (len >= sizeof(buf)) {
+-    vlog.error("Ignoring udp upgrade with too large payload");
+-    is->skip(len);
+-    return;
+-  }
+-
+-  if (!len) {
+-    handler->udpDowngrade(false);
+-    return;
+-  }
+-
+-  is->readBytes(buf, len);
+-  buf[len] = '\0';
+-
+-  wuGotHttp(buf, len, resp);
+-
+-  handler->udpUpgrade(resp);
++  throw Exception("UDP transport is disabled in the Studio runtime");
+ }
+ 
+ void SMsgReader::readSubscribeUnixRelay()
+diff --git a/unix/xserver/hw/vnc/Makefile.am b/unix/xserver/hw/vnc/Makefile.am
+index 26758b1..6ffd955 100644
+--- a/unix/xserver/hw/vnc/Makefile.am
++++ b/unix/xserver/hw/vnc/Makefile.am
+@@ -7,7 +7,7 @@ OS_LIB=$(KASMVNC_BUILDDIR)/common/os/libos.la
+ NETWORK_LIB=$(KASMVNC_BUILDDIR)/common/network/libnetwork.la
+ XREGION_LIB=$(KASMVNC_BUILDDIR)/common/Xregion/libXregion.la
+ UNIXCOMMON_LIB=$(KASMVNC_BUILDDIR)/unix/common/libunixcommon.la
+-COMMON_LIBS=$(NETWORK_LIB) $(RFB_LIB) $(RDR_LIB) $(XREGION_LIB) $(OS_LIB) $(UNIXCOMMON_LIB)
++COMMON_LIBS=$(RFB_LIB) $(NETWORK_LIB) $(RDR_LIB) $(XREGION_LIB) $(OS_LIB) $(UNIXCOMMON_LIB)
+ 
+ noinst_LTLIBRARIES = libvnccommon.la
+ 

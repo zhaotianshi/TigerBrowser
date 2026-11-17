@@ -1,0 +1,4 @@
+* text=auto eol=lf
+# Unified patches use a leading space for empty context lines.
+*.patch whitespace=-blank-at-eol
+tests/** linguist-detectable=false

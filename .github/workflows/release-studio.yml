@@ -1,0 +1,80 @@
+name: Release Studio clients
+run-name: Release Studio clients (${{ inputs.tag }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Exact package version tag (studio-vVERSION); select main
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: studio-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      checks: read
+    outputs:
+      matrix: ${{ steps.release.outputs.matrix }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - id: release
+        run: python -m ci.studio_release prepare --tag "$RELEASE_TAG"
+
+  build:
+    name: Release client (${{ matrix.platform }})
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    permissions:
+      contents: write
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      CLIENT_PLATFORM: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/package-studio-client
+        with:
+          platform: ${{ matrix.platform }}
+      - shell: bash
+        run: python -m ci.studio_release upload --tag "$RELEASE_TAG" --platform "$CLIENT_PLATFORM"
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m ci.studio_release publish --tag "$RELEASE_TAG" --directory .ci-work/studio-release

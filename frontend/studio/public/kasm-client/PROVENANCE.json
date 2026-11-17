@@ -1,0 +1,90 @@
+{
+  "kasmvnc": {
+    "version": "1.5.0",
+    "revision": "17265facc40ab50db5740cdf0d12c61173edafc9",
+    "repository": "https://github.com/kasmtech/KasmVNC"
+  },
+  "client": {
+    "repository": "https://github.com/kasmtech/noVNC.git",
+    "revision": "475ecfa5356579ef222983c7ce4619a7576a3bce",
+    "license": "MPL-2.0"
+  },
+  "build": {
+    "esbuild": "0.25.12",
+    "pako": "2.1.0",
+    "command": "npm --prefix scripts/studio-kasm-client ci && npm --prefix scripts/studio-kasm-client run build"
+  },
+  "adaptations": [
+    "Isolate the decoder from application UI initialization and disable multi-monitor registration.",
+    "Honor disabled WebRTC before allocating a peer connection.",
+    "Do not subscribe to printer or smartcard relays.",
+    "Leave DOM input and focus registration to Studio; RFB handles display traffic only.",
+    "Observe the embedded display host for client-side scaling changes and disconnect the observer on teardown.",
+    "Render the remote cursor with the upstream canvas overlay instead of CSP-blocked data URLs.",
+    "Release decoded image frames and bitmaps after rendering, dropping, queue clearing or late delivery after disposal.",
+    "Reject QOI worker activation; Studio negotiates JPEG/WebP without workers or WebAssembly."
+  ],
+  "sources": {
+    "AUTHORS": "38463c9618552d2363e1cfed4a70887086ec90f2b3ddca22fff6c906cc31a75f",
+    "LICENSE.txt": "cbdddb3bc862a2822634b3f741e1679faa39c12999b6f265982bc0187323decd",
+    "app/constants.js": "fb86d35c01e15ef6f9e3babb9dc6aca80713c6412dc5c08dc1e6eebcf325a70f",
+    "core/assets/av1.bin": "f5ef8ba1539bd1770863f6fd8a284a088661b876a94619b8cb3f40b4d443eea9",
+    "core/assets/avc.bin": "b9a9d0e1ea9e28dc3d23f0e3ed85e64b5b84b37b70cbbfcf767b228727bb7001",
+    "core/assets/hevc.bin": "f853a233eb10b4bb8140bfe35671097c2fb11c5548cf9348dfc065e1665333a8",
+    "core/base64.js": "b565f3dfb2a10ad81da45fccc66b6453f6784bd8fce77aa690fe3e0741435ff4",
+    "core/codecs.js": "716c13afe391715feb58dc6aebb3794f27d6b73c3f001f6871ca5fe4fd49dc03",
+    "core/decoders/copyrect.js": "f00c27d4035b6dacec4a44873aaac5c1c2b17b96521bd282c47b13ee8e939274",
+    "core/decoders/hextile.js": "9faa18b28c17b591d3f2337656245cbd1f972fbf2e34be8744aa3c729cf72cd9",
+    "core/decoders/kasmvideo.js": "d52293a86cdc120a4b32cc1aabb12c8675ec78edabf20df28c09394f6a9d2660",
+    "core/decoders/raw.js": "1b36e8b148d1b72bcf9cd2a5d44e002a55824fac135c44d368e8da26d58ce314",
+    "core/decoders/rre.js": "d150b14604aad5f4e90f63f8c21f20c3981b9f29612e7647bf35efaf61dfc374",
+    "core/decoders/tight.js": "3b065af9ece463ab69ddbea3a548d16655a39128077431a5c792efba8d022a98",
+    "core/decoders/tightpng.js": "dc50411fc2dd4f9302f38cbe918c257656456c7160f3fb48c2a0c49e9d5dc749",
+    "core/decoders/udp.js": "a9e6b9b8d7b96ef45772d48a60a5d1489f0cdc7ef62727159d16a660de945d33",
+    "core/deflator.js": "cd3bfdb68201aab8274e21b712f80fe17ef4c4b34c05c810992f37caf0238e39",
+    "core/des.js": "5051c9917619a783980547ec772fafba7dcf7466363386e2584cf0562e9f6b32",
+    "core/display.js": "a6102b8aaf2baf196e72c907f7f1a4dbc2590f197cd2e1573705ae3d2785b213",
+    "core/encodings.js": "a74b74a8b15bd0b9f7767a3d0fef82de5ada16a554f63fcfa7eb6cbdf337fb91",
+    "core/inflator.js": "6ad8ee83b64002b9464d094750d86936a593fbab9dfad98f26994e60a7827ba1",
+    "core/input/domkeytable.js": "b25578a71e7822d1337f8da383d5f2f29b79fef13e6b0a4d33fd3c518faf9d30",
+    "core/input/fixedkeys.js": "59af0fce68461b14f7ac62643d087655287e61c158aefa55c8a1ef0c9e1c01f9",
+    "core/input/gesturehandler.js": "1f5399d6b2db43d7ce7bf7a70d868597f79aeff4c4735f1d5472738e4dea78d7",
+    "core/input/imekeys.js": "00696b1c62b7340e1685163ede128afc3b0b867a9e296156d78857fc6215047d",
+    "core/input/keyboard.js": "54517a5a29120a053b630e1675684d8d6c9665349c6b28930fe43b68c5b8879f",
+    "core/input/keysym.js": "4ddf0e21f07328358974d91aa2d7f839ba2116688b28e43d3f6f4e2eae8c45cf",
+    "core/input/keysymdef.js": "a87cf9e9b67ddc2e24836630c87aece901c056c53721da4e384d0e9eb71eaea4",
+    "core/input/util.js": "2e156ea656404afcb6cc54dd85cbe5dd2dd0ba209ae9a6fb1b78ec5db17d01ce",
+    "core/input/vkeys.js": "acea26edd998a1f4c194d0d84cf5ba4bf74046ca082890ec6b288eb70c1d8156",
+    "core/input/xtscancodes.js": "f0fc982627e1c02feaac1bd50d7fdd3bcbb05f0062b910d8002f47d1b08967a6",
+    "core/messages.js": "8f9d37853b87e719f4f5a962e1299c667f25ee41c3d80bdf0dc4443a93f6c62e",
+    "core/mousebuttonmapper.js": "f9e4146d8e45b1c039825e452d68604de7fcc923c7883b426d820e3d94cf62cd",
+    "core/renderers/Canvas2DRenderer.js": "004af0f1408e3b9efc0c75eaf598ec57b60c028df42d7913e3ea9104dd8b3a1d",
+    "core/renderers/WebGLRenderer.js": "df57796b653d9e474ca607f03e5dbb0dd7a97bdfad1992900dd295d110e91027",
+    "core/rfb.js": "3f499985bdabb5dd6df80e11ea7f3e5a187fbf7167ae8fc3bd65bf8436443238",
+    "core/util/browser.js": "e465b3d39b31f490dce03dcd8b18bca769829772f6a01a82c201df4e9aba5c7d",
+    "core/util/cursor.js": "365b632233f5a9287b67c001a715076d6c5b0f1622caf262470f0cf9a1f8b05c",
+    "core/util/element.js": "e2813ab0ac8ccb0765b1cd3331132c2f8be580da35388ad36d461162c4d308c5",
+    "core/util/events.js": "026290a0324d14b906f0d943085b327fc8c1ccd2f49a289ce7bd5a56e971bb03",
+    "core/util/eventtarget.js": "f26f0c32559d96d5a147bbdee6f6944d2b38db85dfac58738e58061c1472075c",
+    "core/util/int.js": "c6f9d537f26c8716cd5db0f2e88c36d322d1111a0c9b5762f677e84bcd02ec80",
+    "core/util/logging.js": "505e011b6b2420d40090d123866484bbf7a881c93fcdaca9a0e17b703550375c",
+    "core/util/performance-logger.js": "90ffb7ece6fea40377ff4c6d27c4bda97b4debe882ce44af55d1d63651e0f3a8",
+    "core/util/strings.js": "074cd8820762e57ad8496ec9f894bd981956c6a822715f905a4aa32260ce085f",
+    "core/websock.js": "5f975b756d1a69ccc4648d73702881c890dbf04c95d9cc73be0c2cf93ccf4544",
+    "docs/LICENSE.MPL-2.0": "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85"
+  },
+  "modifiedSources": {
+    "core/decoders/tight.js": "c5f1c2d81f478ee30936fa94250d9b346fa934059fc8e5d34b8da8274e478a0e",
+    "core/display.js": "1a52b5edbdfa8630c91ae88901c8170eb4b1bf6212d72d3aea950ca303899463",
+    "core/rfb.js": "fd2c89bdac1511726a603ab74d3ab4c25176eec77b913bf0581140ccfe5bc2f7",
+    "core/util/cursor.js": "5785530d08c309a36759c9e24f73084191006135fbbf4390bded95bd3e3f6a5f"
+  },
+  "assets": {
+    "rfb.js": "bdb7539c256ec3345144b22232c48cc9f0124de3017589a954db560dc3982937",
+    "rfb.js.map": "0619b472dbb39506c35c3f232d94ee7906b637650d1b33f14f7465c2604bf0e4",
+    "LICENSE.txt": "cbdddb3bc862a2822634b3f741e1679faa39c12999b6f265982bc0187323decd",
+    "MPL-2.0.txt": "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85",
+    "AUTHORS": "38463c9618552d2363e1cfed4a70887086ec90f2b3ddca22fff6c906cc31a75f",
+    "pako-LICENSE.txt": "a04665b3b2de56c66730c1f720f528175739e4104f79073614aa611da1e85539"
+  }
+}

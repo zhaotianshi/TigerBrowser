@@ -1,0 +1,868 @@
+# Decisions this repository has already made, and the evidence for each.
+#
+# Compiled from code comments, commit messages, and the issue/PR record --
+# specifically from what was *rejected*, which is where the reasoning usually
+# lives. A rule earns a place here when someone proposed the opposite, it was
+# considered on the merits, and the answer was no. Those are the decisions that
+# get re-litigated by the next well-meaning contributor, or quietly undone by an
+# agent rebasing patches at 3am.
+#
+# `pythonlib/tests/test_tribal_rules.py` asserts every entry that is mechanically
+# checkable. An entry with `check: manual` is documentation only.
+#
+# Adding one: cite the issue, PR, or commit. "I think this is how it works" is
+# not evidence, and a rule nobody can trace gets deleted the first time it is
+# inconvenient.
+
+schema: 1
+
+rules:
+  - id: studio-automation-memory-maintenance-is-idle-and-run-scoped
+    title: Browser memory maintenance requires an idle owned lease and the exact durable run
+    check: manual
+    evidence:
+      - "pythonlib/tests/test_studio_memory.py: owned metrics, unavailable measurements, manual pages, cancellation and TTL fencing"
+      - "pythonlib/tests/test_studio_team_automation.py: exact durable replacement, management races and repeated controller checks"
+      - "docs/studio-automation.md: optional idle browser memory maintenance contract"
+      - "https://psutil.io/api/: Process children, identity and resident memory measurements"
+    rationale: >-
+      Releasing a task lease does not stop the service-owned browser. An optional,
+      explicit recycle operation may normally stop and replace only the same idle
+      durable run, with the sole owning lease, no task pages, handles or calls, one
+      blank anchor and no native controller. New requests and management races are
+      fenced and the idle boundary is checked again at stop dispatch. Cleanup and
+      recovery barriers remain authoritative; unknown or lost responses never
+      authorize another automatic stop/start. Cancellation retains one bounded
+      operation and exempts only that lease's TTL while authorization still applies.
+      Read-only aggregate RSS identifies an exact owned profile process tree;
+      missing, ambiguous or incomplete measurements stay unavailable rather than zero.
+
+  - id: studio-source-checks-do-not-depend-on-release-storage
+    title: Source validation is independent of installer publication and artifact quota
+    check: manual
+    evidence:
+      - "ci/tests/test_workflows.py: artifact-free source checks retain the full four-platform gate and share the release packager"
+      - "ci/tests/test_studio_release.py: exact-source CI, draft ownership and complete digest-verified platform sets"
+      - "docs/studio-releases.md: publication rules, capacity handling and explicit source-only updates"
+    rationale: >-
+      Artifact quota cannot become a dependency of code verification. Source jobs
+      build their own locked frontend and retain all four native installer checks
+      without uploading Actions artifacts. Only an explicit release workflow may
+      write a source-bound draft. Every platform and downloaded digest must verify
+      before publication; failed or unavailable publication leaves source updates
+      independent, never a fabricated successful release or a raised spending limit.
+
+  # -------------------------------------------------------------------------
+  # Virtual display
+  # -------------------------------------------------------------------------
+
+  - id: virtual-display-default-1x1x24
+    title: The Xvfb default screen is 1x1x24 and stays that way
+    check: automated
+    evidence:
+      - "PR #714 (rejected): 'use 1920x1080 screen size for virtual display'"
+      - "PR #724 (rejected): the same change, proposed again"
+      - "issue #458: blank screenshots, the reported motivation for both"
+    rationale: >-
+      Proposed twice, rejected twice, on two grounds. First, it does not fix
+      anything: rendering was measured identical at both sizes -- innerWidth
+      1280, innerHeight 984, fullpage 1280x5367 either way, with only
+      fingerprint-rotation noise in the colour count. Second, it costs
+      throughput: past 30-40 concurrent browsers the framebuffer becomes the
+      bottleneck on a machine that handles 70-80 at 1x1. The root window is not
+      a fingerprint -- screen.* comes from the generated fingerprint, applied
+      per context in the browser.
+    expect:
+      module: camoufox.virtdisplay
+      attribute: DEFAULT_SCREEN
+      equals: "1x1x24"
+
+  - id: virtual-display-size-override-exists
+    title: The screen size is overridable, just not by default
+    check: automated
+    evidence:
+      - "PR #714 review: 'hardcoding 1920x1080 would be the wrong default'"
+    rationale: >-
+      The rejection was of the *default*, not the capability. Anyone who needs a
+      real framebuffer sets CAMOUFOX_VIRTUAL_DISPLAY_SIZE. Removing the hatch
+      would turn a settled disagreement back into an open one.
+    expect:
+      module: camoufox.virtdisplay
+      attribute: SCREEN_ENV_VAR
+      equals: CAMOUFOX_VIRTUAL_DISPLAY_SIZE
+
+  - id: composite-extension-off
+    title: The X Composite extension stays disabled by default
+    check: automated
+    evidence:
+      - "issue #93: no video under headless='virtual'"
+      - "pythonlib/camoufox/virtdisplay.py: the measurement table"
+    rationale: >-
+      Briefly enabled on the theory that disabling it caused #93. It did not --
+      #93 was a Juggler bug, fixed by capturing the screencast from the
+      compositor instead of libwebrtc's X11 window capturer. Measured at the
+      time: Composite on + record_video_dir crashed the browser with SIGSEGV
+      inside the X11 capturer. That capturer is gone, so enabling it is no
+      longer dangerous, but it is no longer useful either. Off is the
+      long-standing default and there is now no reason to move.
+    expect:
+      module: camoufox.virtdisplay
+      attribute: COMPOSITE_ENV_VAR
+      equals: CAMOUFOX_VIRTUAL_DISPLAY_COMPOSITE
+
+  - id: displayfd-not-lockfile-scan
+    title: Displays are claimed atomically with Xvfb -displayfd
+    check: automated
+    evidence:
+      - "issue #597 / commit 8f9ff07"
+    rationale: >-
+      The old userspace lock-file scan plus random-jitter retry raced: many
+      camoufox processes starting at once all saw the same free display numbers
+      before any of them bound. -displayfd lets Xvfb scan up from :0 and bind
+      the first free socket itself -- kernel-mediated, no userspace race -- then
+      writes the number back down an inherited pipe.
+    expect:
+      module: camoufox.virtdisplay
+      xvfb_args_contain: "-displayfd"
+
+  - id: displayfd-read-timeout
+    title: The displayfd read is bounded
+    check: automated
+    evidence:
+      - "commit 8f9ff07: 'so a hung Xvfb fails fast instead of blocking forever'"
+    rationale: >-
+      A hung Xvfb with no timeout blocks the launch forever, at 0% CPU, with no
+      diagnostic. Ten seconds is the agreed bound.
+    expect:
+      module: camoufox.virtdisplay
+      attribute: DISPLAYFD_READ_TIMEOUT_S
+      is_positive_number: true
+
+  - id: xvfb-cleanup-runs-even-if-it-already-died
+    title: The display's lock and socket are removed whether or not we killed it
+    check: automated
+    evidence:
+      - "found by native-tests/test_crash_recovery.py::test_xvfb_sigkill_under_a_virtual_display"
+      - "pythonlib/tests/test_tribal_rules.py: cleanup remains independent of a live process after the browser-build tests were retired"
+      - "isolated: Xvfb alive -> socket removed; Xvfb already dead -> socket leaked"
+    rationale: >-
+      kill() used to gate its entire body on `self.proc.poll() is None`, so a
+      display whose Xvfb had already died -- crashed, OOM-killed, reaped with
+      the browser's process group -- was never cleaned up. That is backwards: a
+      SIGKILLed Xvfb never removes its own socket, so the crash path is the only
+      one where /tmp/.X11-unix/X<n> survives, and it was the one path kill()
+      skipped. Stranded sockets accumulate, and -displayfd scans upward for a
+      free number, so each one pushes the next display higher until a
+      long-running host stops being able to allocate one at all.
+
+  - id: xvfb-sigkill-and-socket-cleanup
+    title: Xvfb is SIGKILLed, reaped, and its X11 lock and socket removed
+    check: automated
+    evidence:
+      - "PR #652 / commit 71fe028"
+      - "PR #618 / commit ce5edf6: wait() the child or it becomes a zombie"
+    rationale: >-
+      The old terminate-wait-kill ladder left zombie Xvfb processes, and the
+      stale /tmp/.X{n}-lock and /tmp/.X11-unix/X{n} files it left behind blocked
+      later display allocation. Both halves matter: SIGKILL then wait() so
+      nothing is reaped later, then unlink both files.
+
+  # -------------------------------------------------------------------------
+  # Dependencies
+  # -------------------------------------------------------------------------
+
+  - id: no-third-party-camoufox-distribution
+    title: Nothing here depends on someone else's camoufox package
+    check: automated
+    evidence:
+      - "PR #521 (2026-03-15) added `cloverlabs-camoufox` to build-tester/requirements.txt"
+      - "the commit's author is the PyPI author of that package"
+      - "pythonlib/tests/test_tribal_rules.py: application tests reject third-party Camoufox requirements"
+    rationale: >-
+      Whichever distribution provides camoufox decides which launcher, identity
+      generation and Studio engine are actually tested. A third-party redistribution
+      substitutes another implementation and pulls an outside package into jobs
+      holding repository credentials. The only camoufox distribution installed
+      by this repository is pythonlib/ from this tree. Browser artifacts remain
+      separate installed inputs rather than Python package replacements.
+    expect:
+      no_dependency_matching: "camoufox"
+      except_paths: ["pythonlib/pyproject.toml"]
+      allowed_forms: ["-e ../pythonlib", "-e ./pythonlib", "-e pythonlib"]
+
+  - id: launch-failure-tears-down-playwright
+    title: A failed launch must not leak the Playwright session
+    check: automated
+    evidence:
+      - "issue #82 / PR #655 / commit 0d54401"
+    rationale: >-
+      The Playwright session is started before the browser. If the launch then
+      raises -- bad proxy, missing binary, invalid options -- the driver process
+      and its connection stay alive with nothing holding them. Every launch path
+      wraps the launch and calls the base __aexit__ on failure.
+
+  - id: close-failure-still-tears-down
+    title: browser.close() raising must not skip teardown
+    check: automated
+    evidence:
+      - "issue #82 / PR #655 / commit 0d54401"
+      - "commit fd1bb2f: the same rule for the virtual display"
+    rationale: >-
+      A browser that has already crashed makes close() raise, and the original
+      code let that exception skip the driver teardown -- so the failure mode
+      that leaks is exactly the one that happens under load. The close goes in a
+      try, the teardown in the finally. The virtual display is cleaned up the
+      same way.
+
+  # -------------------------------------------------------------------------
+  # Contexts and windows
+  # -------------------------------------------------------------------------
+
+  - id: no-viewport-when-window-is-spoofed
+    title: Spoofed window dimensions imply no_viewport
+    check: automated
+    evidence:
+      - "issue #666 / PR #673: page-recycle hang under spoofed window dims"
+    rationale: >-
+      Playwright's default viewport deadlocks Juggler when the window has been
+      spoofed to a different size. Both launch paths default to no_viewport when
+      spoofs_window_dimensions() is true, unless the caller said otherwise.
+    expect:
+      module: camoufox.utils
+      has_callables: [spoofs_window_dimensions, attach_no_viewport_default]
+
+  - id: virtual-display-skips-screen-clamp
+    title: A virtual display never clamps the generated screen
+    check: automated
+    evidence:
+      - "pythonlib/camoufox/utils.py: the `not virtual_display` guards"
+    rationale: >-
+      This is what makes the 1x1 default safe. If clamping applied, a 1x1 root
+      window would clamp every generated screen down to 1x1 and the fingerprint
+      would be absurd. The guard and the 1x1 default stand or fall together --
+      remove the guard and the display size stops being a free choice.
+
+  - id: studio-uses-native-browser-tabs
+    title: Studio restores native browser chrome at launch without changing saved identities
+    check: manual
+    evidence:
+      - "pythonlib/camoufox/studio/engine.py: disableTheming requests native chrome from the installed browser artifact"
+      - "https://github.com/daijro/camoufox/releases/tag/v135.0-beta.21: disableTheming restores the original Firefox UI"
+      - "pythonlib/tests/test_studio_engine.py: native tabs for new profiles and unchanged identities for existing profiles"
+      - "Windows 152.0.4-beta.31, 2026-10-01: legacy tab double-click selected the tab and maximized the window; native chrome restored single-click selection without maximizing"
+    rationale: >-
+      Older distributions ship a minimal chrome.css that makes tabs inherit the
+      toolbar's window drag region. Studio uses the native disableTheming switch
+      on every launch, including for identities created before this fix. This
+      avoids modifying shared browser installations or regenerating identities
+      to repair a browser UI setting.
+
+  - id: studio-timezone-choices-share-server-validation
+    title: Timezone choices use the server database and preserve saved values
+    check: manual
+    evidence:
+      - "https://tzdata.python.org/#contents: tzdata.zi contains the source database"
+      - "pythonlib/tests/test_studio_timezones.py: canonical records, source precedence and invalid metadata"
+      - "frontend/studio/src/__tests__/profile-settings.test.ts: automatic timezone is an explicit empty value"
+    rationale: >-
+      A separate frontend list can disagree with the server's accepted names.
+      Read canonical regional Zone records from its active database metadata,
+      validate each with ZoneInfo, and fail if that metadata is incomplete.
+      Keep saved aliases and disconnected interface choices until explicitly
+      changed. Probe timezone hints are observations, never launch decisions;
+      reject stale probe writes and invalidate hints on routing changes.
+
+  - id: studio-team-reuses-python-engine-on-fixed-host
+    title: The team service reuses the Python engine and runs each active profile in one place
+    check: manual
+    evidence:
+      - "docs/studio-team.md: language decision, reuse boundaries and single-location execution"
+      - "pythonlib/camoufox/studio/team/control.py: connection-bound input leases fence input without stopping a browser"
+      - "pythonlib/camoufox/studio/engine.py: prepare_launch and BrowserEngine own persistent identity and session routing"
+      - "https://www.sqlite.org/useovernet.html: keep database access local and expose application requests over the network"
+    rationale: >-
+      The team design adds authenticated shared access, not a second browser
+      launcher or fingerprint generator. The existing Python engine owns identity
+      validation, persistent data, proxy routing and cleanup; a Go rewrite or a
+      second launch path would duplicate these decisions without a measured
+      bottleneck. An active profile runs on the server or on the one client that
+      holds its check-out lease; clients use the service, not a shared
+      filesystem, and both locations use the same Python engine. Member control
+      expiry never proves that a browser has stopped and must not authorize a
+      second instance.
+
+  - id: studio-workspace-unlocks-only-after-clean-engine-shutdown
+    title: Services and client caches retain workspace ownership after uncertain cleanup
+    check: manual
+    evidence:
+      - "docs/studio-preflight.md: local-filesystem ownership, compatibility and explicit crash recovery"
+      - "pythonlib/tests/test_studio_workspace.py: concurrent owners, legacy Qt mutual exclusion and crash barrier"
+      - "pythonlib/tests/test_studio_engine.py: browser exit failure, bridge shutdown failure and remaining resource cleanup"
+      - "pythonlib/tests/test_studio_control.py: late viewer disconnect waits for the same run's cleanup and cannot stop a replacement run"
+      - "service-tester/studio_native_tests.py: closing the final native tab with a connected viewer permits restart with unchanged site data and identity"
+      - "pythonlib/tests/test_studio_client_local.py: one process per client cache, released only after a clean shutdown"
+    rationale: >-
+      A dead manager does not prove that its persistent browser or proxy has
+      stopped. A durable directory at the legacy lock path prevents automatic
+      stale-lock takeover without importing Qt into the team service. The service
+      and each client cache release only after successful engine shutdown; resource exit
+      failures also block subsequent launches in that engine. Normal session
+      errors with successful cleanup remain recoverable. Lock age, a missing
+      PID and member lease expiry never authorize another browser on the same
+      profile. This is a trusted local-filesystem barrier, not distributed
+      locking or proof of child-process identity.
+      A viewer can outlive its browser. Release waits for that run's owned cleanup
+      instead of sending input to an already closed worker; genuine cleanup
+      failure keeps the engine barrier, and a new run cannot inherit old input.
+
+  - id: studio-preflight-is-read-only-and-not-remote-readiness
+    title: Host checks preserve installation state and do not certify remote-team support
+    check: manual
+    evidence:
+      - "docs/studio-preflight.md: static-check scope, warnings and explicit credential-backend inspection"
+      - "pythonlib/tests/test_studio_preflight.py: platform modes, redacted failures, no Qt/network and credential boundaries"
+      - "pythonlib/tests/test_browser_pin.py: read-only resolution selects the same build without writing configuration"
+      - "https://learn.microsoft.com/en-us/windows/win32/services/interactive-services: service and interactive-user sessions are distinct"
+    rationale: >-
+      Linux is the remote execution platform; Windows, macOS and Linux clients
+      run checked-out profiles locally. Remote KasmVNC support follows the 2026-10-16 decision
+      in issue #13. A deployment check must not silently select
+      another active build, delete old installations, generate identities or
+      expose credentials. Reuse the version resolver with writes disabled.
+      Display variables, visible Windows window stations and native keyring
+      backend discovery establish prerequisites only, not successful rendering,
+      unlocked credentials or environment isolation. Static preflight cannot prove authenticated remote rendering and revocation,
+      so remote-mode readiness must fail independently of installed tools.
+
+  - id: studio-team-auth-is-local-first-and-redacted
+    title: Team membership storage starts local, with salted hashes, rate limits and no team export
+    check: manual
+    evidence:
+      - "pythonlib/camoufox/studio/store.py: team tables, scrypt template, login lockout and permission-version sessions"
+      - "pythonlib/tests/test_studio_team_store.py: member lifecycle, lockout windows, grant boundaries and audit whitelist"
+      - "pythonlib/tests/test_studio_team_setup.py: terminal initialization of new or existing memberless workspaces without Qt or network access"
+      - "pythonlib/tests/test_studio_member_groups.py: group unions, role caps, revision checks, transaction rollback and targeted session revocation"
+      - "pythonlib/tests/test_studio_automation.py: the loopback bridge refuses to start or answer without a member login"
+      - "docs/studio-member-groups.md: grant rules, targeted login revocation and redacted audit"
+      - "https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html: server-side session state and idle expiry"
+    rationale: >-
+      Member accounts, login sessions, environment grants and the management
+      audit live in the workspace database before any network service exists,
+      so the future team API reuses one authorization function instead of
+      growing a second permission path. Passwords use a salted scrypt template;
+      configuration exports never carry member, session, grant or audit records, and audit
+      fields are whitelisted codes that reject secrets and free text. Login
+      failures reserve their attempts inside a transaction that still commits,
+      because rolling back a failed login would also erase the rate limit.
+      Grant and membership changes bump a permission version captured at login,
+      so revocation applies to existing sessions immediately rather than at
+      the next login. Member names are byte-exact and never reused, including
+      after a member is disabled; the administrator is singular. This covers
+      local storage only and does not certify any remote interface.
+      The first administrator is created only by the local studio-team-init
+      command while it holds workspace ownership; an existing workspace needs
+      the explicit --existing flag and must have no members. There is no
+      desktop login window and no memberless mode: every client connects to a
+      server, and every loopback automation bridge requires a member login.
+      The client's local automation borrows its server login, renews it only
+      through the server, and never treats the legacy flag as authorization.
+      Persistent login deadlines
+      use Unix time; monotonic reference points do not survive host reboot.
+      Direct and member-group grants use that same resolver and remain capped
+      by the member's role. Profile labels never imply access-group membership.
+      Group membership and grant changes require the expected group revision;
+      batch grants commit atomically and revoke affected sessions. Unchanged
+      saves neither bump revisions nor invalidate logins. Group deletion removes
+      only that group's relationships, never profiles or direct grants.
+
+  - id: studio-local-team-automation-shares-member-and-run-ownership
+    title: Team automation uses live member grants and existing browser ownership
+    check: manual
+    evidence:
+      - "docs/studio-automation.md: current grants, scoped keys, lease ownership and revocation"
+      - "pythonlib/tests/test_studio_api_keys.py: digest-only storage, scope isolation, live grants and revoked credentials"
+      - "pythonlib/tests/test_studio_team_automation.py: grant boundaries, durable start, exclusive borrowing, cleanup and non-reviving session renewal"
+      - "https://docs.python.org/3/library/asyncio-task.html#shielding-from-cancellation: cancellation can leave a shared task running, which requires a retained task reference"
+    rationale: >-
+      Applications use member-owned API keys on a separate listener without a
+      second launcher or team bypass. MemberStore resolves current grants for
+      every request and intersects immutable key scope; durable reservations
+      repeat this check inside the write transaction. Each key owns its leases
+      and task pages. Password resets and member disablement permanently revoke
+      key sessions; grant changes alter access without replacing credentials.
+      Network mode never writes a shared discovery credential. Cancelling a
+      request cannot abandon a shared launch. Releasing a lease leaves manual
+      tabs and service-owned browser runs intact.
+      The desktop opts in separately and reuses its current member login and
+      browser engine; automation never extends that login's expiry.
+
+  - id: studio-main-world-is-an-explicit-session-requirement
+    title: Automation requests main-world execution per launch without changing saved identities
+    check: manual
+    evidence:
+      - "https://camoufox.com/python/main-world-eval/: main-world execution is opt-in and requires the mw: prefix"
+      - "docs/studio-automation.md: capability discovery, actual session state and single-profile conflicts"
+      - "pythonlib/tests/test_studio_main_world.py: selected-kernel schema, unchanged identities, legacy reuse and concurrent requirements"
+      - "pythonlib/tests/test_studio_team_automation.py: durable run ownership and lease state"
+      - "pythonlib/tests/test_studio_client_automation.py: checkout ownership, concurrent launch and sanitized failures"
+    rationale: >-
+      A page-realm task needs a launch capability, not an external maintenance
+      script or a permanent fingerprint edit. Both automation entrypoints pass
+      the explicit requirement through the shared engine's copied launch config.
+      API discovery does not certify every kernel: check the selected executable's
+      properties.json, because generic config validation tolerates unknown keys.
+      Report actual session state rather than the request or saved preference.
+      Concurrent callers each check their requirement after the shared launch;
+      an incompatible live session fails without stopping tasks or manual tabs
+      by default. The team listener may advertise an explicit restartIfNeeded
+      extension: callers must drain work and release leases first; the bridge
+      excludes competing leases while the existing durable stop/start paths
+      replace that exact run. It never edits the saved identity, weakens cleanup
+      barriers or abandons a reserved restart on caller cancellation.
+      Omission and false preserve existing behavior, including enabled legacy
+      sessions. Normal evaluation stays isolated; only mw: selects the main world.
+      No service restart, identity reset, workspace-lock bypass or mandatory native
+      diagnostic belongs in this per-profile operation.
+
+  - id: studio-native-downloads-use-the-profile-bind
+    title: Native accepted downloads use a path visible to both the browser and driver
+    check: manual
+    evidence:
+      - "pythonlib/tests/test_studio_native.py: accepted downloads stay inside the profile bind"
+      - "docs/studio-automation.md: the browser private tmp cannot serve driver download reads"
+      - "https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch-persistent-context-option-downloads-path: downloads_path selects the accepted download directory"
+    rationale: >-
+      A native browser has its own tmp mount, while the Playwright driver runs
+      outside that mount. Default temporary download paths can therefore produce
+      successful browser events followed by missing files during byte transfer.
+      Use the existing checked Downloads directory in the profile bind, where
+      both processes resolve the same path. This adds no host directory access
+      and preserves Playwright's accepted-artifact deletion lifecycle.
+
+  - id: studio-team-management-is-not-remote-display
+    title: Network management uses distinct HTTP capabilities and durable execution without claiming display readiness
+    check: manual
+    evidence:
+      - "docs/studio-team-service.md: optional dependencies, exact network boundary and explicit preview scope"
+      - "pythonlib/tests/test_studio_team_service.py: hashed cookies, CSRF, Origin, existing connection revocation and persistent command ownership"
+      - "pythonlib/tests/test_studio_engine.py: parallel legacy starts still share one session"
+      - "https://fastapi.tiangolo.com/advanced/events/: one application lifespan owns shared resources"
+      - "https://uvicorn.dev/settings/: explicit workers, TLS, proxy-header and connection limits"
+    rationale: >-
+      The local desktop's session ID is not a network credential. The team service
+      issues a separate 256-bit cookie capability and stores only its digest,
+      while reusing the same role-capped member resolver. Every mutation requires
+      exact Origin and session-bound CSRF; persistent status connections revalidate
+      and close on revocation. A single worker reserves a durable run before browser
+      side effects and rechecks authorization before dispatch. Stop intent fences
+      a queued late start, and stopped request IDs never launch again. Desktop and
+      local hosts cannot bypass unresolved durable runs by deleting a workspace
+      marker. Engine startup still claims its in-memory session before yielding,
+      so the existing loopback start-and-wait flow remains atomic. Explicit headless
+      jobs are separate from native remote display, never its automatic fallback.
+      Native capabilities are enabled only in explicit remote preview mode;
+      disabled and headless modes never advertise display or input capabilities.
+      Production deployment checks remain unavailable until the complete headed
+      runtime manifest and crash ownership gates pass, independently of preview features.
+
+  - id: studio-native-clients-never-resolve-host-display-sockets
+    title: All native display clients use the environment's private filesystem socket namespace
+    check: manual
+    evidence:
+      - "pythonlib/tests/test_studio_native.py: workers hide host sockets and bind only their owned socket"
+      - "service-tester/studio_native_tests.py: actual Unicode input, separate clipboards, cross-display authentication and display-failure isolation"
+      - "service-tester/studio_native_tests.py: full long-text transfer and explicit selection/clipboard export through the authenticated native socket"
+      - "pythonlib/tests/test_studio_control.py: only the current controller can export text, with authorization rechecked after reading"
+      - "service-tester/studio_native_tests.py: narrow-window restoration, full-viewport rendering and original-size client coordinates"
+      - "https://manpages.ubuntu.com/manpages/noble/man1/xdotool.1.html: windowmove/windowsize synchronization still requires checking final geometry"
+      - "https://github.com/python-xlib/python-xlib/blob/0.33/Xlib/support/unix_connect.py: filesystem sockets are preferred when present"
+      - "https://github.com/astrand/xclip/blob/master/xclib.c: native selection conversion and foreground ownership"
+      - "docs/studio-team-service.md: explicit Linux preview, software rendering and private clipboard limits"
+    rationale: >-
+      A display number is not a socket identity. A private Xvfb may allocate :0
+      while WSLg has a filesystem socket with the same number; LibX11 and Python
+      Xlib do not select transports in the same order. Random cookies alone do
+      not prevent connecting to a host display that accepts unauthenticated clients.
+      Browser, capture, input and selection workers therefore hide host filesystem
+      sockets and bind only the owned socket. Every display has its own secret
+      authority; all remote traffic passes through the member gateway. Explicit
+      text is held only on that display with a supervised native selection owner,
+      never read from or synchronized with a host clipboard.
+      Explicit client copy requests may read bounded text from that same private
+      display after checking the active control lease, and recheck authorization
+      before returning it. Selected-text copies require a fresh native Ctrl+C
+      result rather than returning stale clipboard contents. No background clipboard
+      synchronization or host display access is introduced. Client dimensions
+      cannot change saved identity dimensions; display failures stop their own run.
+      Without a window manager, startup explicitly fits the native primary window
+      to that saved display and verifies its geometry. Client fullscreen and scaling
+      remain presentation-only; a larger client screen never regenerates an identity.
+
+  - id: derived-fontconfig-cache-is-verified-and-atomic
+    title: Regenerate invalid derived Fontconfig files without modifying browser font identities
+    check: manual
+    evidence:
+      - "pythonlib/tests/test_fontconfig_cache.py: Unicode/XML paths and empty, truncated or unrelated cached data"
+      - "pythonlib/camoufox/utils.py: exact template-derived UTF-8 content, fsync and atomic replacement"
+      - "docs/studio-team-service.md: font cache repair is distinct from headed font attestation"
+    rationale: >-
+      Existence does not prove a generated cache is valid: an interrupted write
+      may leave an empty file that is reused indefinitely. Compare actual derived
+      bytes before reuse, escape XML path text, write a unique temporary file on
+      the same filesystem and replace only after flushing it. The installed template
+      and saved font identity are inputs, not recovery targets; never reset an identity
+      or disable font protection to conceal a cache or rendering failure.
+
+  - id: studio-backup-never-activates-an-identity-clone
+    title: Stopped snapshots are authenticated and restore quarantined until the exact source is retired
+    check: manual
+    evidence:
+      - "pythonlib/tests/test_studio_backup.py: authentication, path boundaries, source changes, second-copy rejection and failed activation commits"
+      - "pythonlib/tests/test_studio_manifest.py: actual artifact changes fail without resetting identities"
+      - "docs/studio-backup.md: key separation, native credential exclusion and explicit headless-only registration"
+      - "docs/studio-migration.md: default same-platform handover and explicitly accepted platform differences"
+      - "pythonlib/tests/test_studio_migration.py: OS changes preserve data and require matching architecture, saved browser version and an activated receipt-bound profile set"
+      - "pythonlib/tests/test_studio_migration.py: native modes require an activated, receipt-bound OS handover for an existing source-OS fixed profile"
+      - "pythonlib/tests/test_studio_native.py: native extension mounts follow the resolved launch configuration without rewriting a saved identity"
+      - "pythonlib/tests/test_studio_manifest.py: portable artifact digests sort relative path text independently of host case-folding"
+      - "https://docs.python.org/3/library/pathlib.html#general-properties: native path ordering respects each flavour's case-folding semantics"
+      - "pythonlib/tests/test_studio_migration.py: destination-bound retirement, repeated migration and publication/commit failure recovery"
+      - "https://support.gologin.com/en/articles/14404855-profile-synchronization: close and synchronize profiles before changing devices"
+      - "https://cryptography.io/en/50.0.2/cobblestone/: bounded authenticated streams require finalization to establish completeness"
+      - "https://github.com/mozilla-firefox/firefox/blob/main/toolkit/profile/nsProfileLock.cpp: Unix PID locks use symlinks and are runtime state, not profile data"
+      - "service-tester/studio_runtime_tests.py: real fixed-host TCP execution, persistent site data and exclusive encrypted recovery"
+      - "pythonlib/tests/test_studio_checkouts.py: snapshots refuse an active check-out lease or an unfinished return"
+    rationale: >-
+      Configuration export is not a browser-data backup. A check-out lease is
+      the only way another computer runs a profile while the server keeps it,
+      so snapshots refuse an active lease or an unfinished return. A stopped snapshot owns
+      the common workspace lock and rejects unresolved runs, copies SQLite with
+      its backup API, excludes login capabilities and native credential secrets,
+      and publishes only after authenticated encryption and integrity verification.
+      Keys stay separate from archives and workspaces. Restoration verifies the
+      complete stream before extraction, rejects nonportable paths and links, and
+      publishes into a new isolated directory with a durable execution barrier.
+      Exclusive activation checks the exact source, unchanged data, registered
+      headless artifacts and restored credentials, then commits source retirement
+      before activating the copy. Failure between commits leaves both fenced;
+      the same transfer can resume but a second copy cannot become executable.
+      Cross-host handover requires an explicit migration snapshot of actual source
+      artifacts and matching OS, architecture, browser, model, addons and packages.
+      An explicitly accepted OS change may replace only the platform browser artifact,
+      with matching architecture and every saved identity's browser version; addons,
+      model and package versions remain exact. The choice is bound into the request,
+      and does not weaken same-platform artifact checks or regenerate an identity.
+      Native surface modes on those migrated fixed profiles may keep the source
+      identity OS while observing the explicitly accepted destination resources.
+      The launch exception requires the matching activated request, source retirement
+      receipt, destination workspace and migrated profile set. Ordinary launches,
+      new profiles and uninitialized identities retain host OS coherence checks.
+      Version 2 migration artifact records use portable relative-name ordering for
+      extension content; legacy same-platform migration and registered host hashes
+      keep their existing ordering. Cross-platform acceptance requires version 2
+      records and checks every mapped extension and the set of default addon names.
+      The stopped destination accepts host differences and requests one immutable
+      transfer; the source durably retires before issuing its encrypted, destination-bound
+      receipt. Activation rechecks unchanged data, actual runtime and native secrets,
+      then rebinds only local paths and host baselines. Identities and member grants
+      remain intact, logins are revoked and old native certificates move to history.
+      Historical native measurements neither authorize nor block launch; activation
+      itself completes the handover without a per-profile administrator reacceptance.
+      Restoration discards prior transfer requests and activation capabilities so
+      a later planned migration uses a fresh destination rather than replaying history.
+      There is no automatic cloud synchronization or takeover of an unreachable source;
+      local administrators and their protected backup keys remain trusted authorities.
+      Legacy identities are never retroactively certified by an automatic runtime
+      manifest. Explicit headless registration hashes actual artifacts and host
+      inputs; it does not certify native display, GPU drivers or disaster recovery.
+      Only the three native transient lock names directly under a registered
+      profile are excluded, without reading symbolic-link targets or deleting
+      source entries. A directory at a lock name is rejected; nested same-name
+      links and all other data links remain unsafe. Excluding a runtime lock is
+      never evidence that the original process has stopped.
+
+  - id: studio-crash-recovery-needs-a-kernel-lifetime-proof
+    title: Explicit recovery requires a stopped kernel boundary and preserves durable ownership evidence
+    check: manual
+    evidence:
+      - "service-tester/studio_boundary_tests.py: real Linux PID namespaces, Windows jobs, detached children and committed browser state"
+      - "pythonlib/tests/test_studio_recovery.py: live owner, wrong run owner, legacy records and quarantine rejection"
+      - "pythonlib/tests/test_studio_recovery.py: preserve long-lived API-key grants and their session rows without reviving revoked keys"
+      - "https://man7.org/linux/man-pages/man7/pid_namespaces.7.html: namespace init exit terminates descendants"
+      - "https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects: kill-on-close jobs and inherited containment"
+    rationale: >-
+      A stale PID or disappeared manager does not prove browser descendants exited.
+      Team managers therefore own a Linux namespace as PID 1 or a non-inheritable
+      Windows job handle without breakaway. Recovery checks host identity and exact
+      process creation data; unknown, live and legacy boundaries fail closed.
+      Recovery stops only matching durable runs, marks unconfirmed commands unknown,
+      revokes logins and archives the original lock. It never resets identities,
+      deletes Firefox locks, replays commands or removes restore/retirement barriers.
+      Long-lived API-key grants are independent of crashed browser/login sessions:
+      recovery preserves their session rows, scope, expiry and revocation state,
+      without reviving revoked credentials or replaying accepted commands.
+      Unflushed browser data and Windows input state are not made durable by process
+      containment; an unproven Windows worker teardown retains the recovery barrier.
+      Linux launch wrappers forward normal termination through the exact init's
+      pidfd and wait for cleanup, rather than killing the monitor and turning every
+      normal stop into a crash. Process identifiers alone are never signal targets.
+
+  - id: studio-native-measurements-are-diagnostic-not-launch-gates
+    title: Native measurements are explicit diagnostics and never authorize routine launch
+    check: manual
+    evidence:
+      - "pythonlib/tests/test_studio_engine.py: stale native measurements and migration runtime manifests cannot block routine restart"
+      - "pythonlib/tests/test_studio_migration.py: activation retains migration scope without adding a native reacceptance gate"
+      - "pythonlib/tests/test_studio_attestation.py: the opt-in diagnostic rejects incomplete measurements and records a canonical source digest"
+      - "pythonlib/tests/test_studio_native.py: the private display uses prepared dimensions without rewriting the saved identity"
+      - "service-tester/studio_attestation_tests.py: a real headed diagnostic records four reads while a changed historical record does not block restart"
+      - "frontend/studio/src/diagnostics/collectors.ts: the sole collector source"
+      - "docs/studio-native-acceptance.md: diagnostic scope and independent deployment checks"
+    rationale: >-
+      Juggler's isolated world observes cross-compartment wrappers rather than a site's content
+      realm; typed-array reads can fail there without a failed browser measurement.
+      The opt-in diagnostic runs the existing collector only in a fresh synthetic
+      content document and leaves main-world automation disabled. Two independent
+      starts with two reads each must agree before a result is recorded. Saved
+      identities, actual assets, host identity and measured digests remain useful
+      evidence; missing or failed measurements cannot become successful empty records.
+      Timing-dependent realtime analyser values and wall-clock strings are not
+      identity hashes. Eleven measured surfaces do not certify every stealth vector,
+      GPU driver or a physical deployment. Canonical LF source hashes preserve the
+      generated collector provenance across Windows and Linux checkouts.
+      Routine launch reads neither stored measurements nor the artifact manifest
+      recorded for stopped backup and migration. A service restart, resource
+      adjustment or host change therefore cannot turn either record into an
+      administrator reacceptance requirement. Route failures,
+      workspace ownership, recovery barriers, native-session safety and migration
+      source retirement remain independent fail-closed checks. Stopped profile edits
+      preserve the saved identity; running the diagnostic again is an operator choice,
+      not permission to start the browser.
+
+  - id: studio-plaintext-lan-is-an-explicit-private-ip-mode
+    title: Plaintext access has explicit transport and independently configurable direct-peer scope
+    check: manual
+    evidence:
+      - "pythonlib/tests/test_studio_team_service.py: unrestricted explicit HTTP, optional private-peer scope, IP/CIDR allowlists and authenticated HTTP/WebSocket boundaries"
+      - "frontend/studio/src/__tests__/api.test.ts: cryptographic request IDs without secure-context randomUUID"
+      - "https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues: cryptographic random bytes outside secure contexts"
+      - "docs/studio-native-acceptance.md: plaintext risks, network-scope combinations, unchanged defaults and actual cross-OS validation"
+      - "docs/studio.md#client-packages: client installers and their digest records share one plaintext connection over HTTP"
+    rationale: >-
+      HTTP remains an explicit transport choice, never an automatic TLS fallback,
+      but it is not inherently limited to private peers. Operators can independently
+      require direct loopback/RFC1918/ULA peers and can apply a repeatable IP/CIDR
+      allowlist; combined scopes are intersected and forwarded headers are ignored.
+      Exact Host/Origin, authentication and CSRF remain mandatory. Passwords,
+      capabilities, frames and files remain plaintext; persistent warnings and
+      documentation state that authentication, network scopes and allowlists do not
+      encrypt traffic. Check-out data, proxy passwords, API keys and client
+      installers are equally plaintext; a digest delivered on the same connection
+      cannot detect a replaced installer. Deployments needing confidentiality or
+      installer integrity still require trusted TLS.
+      Request IDs use CSPRNG bytes so durable idempotency works without secure-context APIs.
+
+  - id: studio-kasmvnc-fixed-private-runtime
+    title: Studio KasmVNC uses a pinned cache-corrected server with private filesystem IPC
+    check: manual
+    evidence:
+      - "https://github.com/kasmtech/KasmVNC/issues/371"
+      - "https://github.com/kasmtech/KasmVNC/pull/372"
+      - "docs/studio-kasmvnc-runtime.md"
+      - "scripts/data/studio-kasmvnc-private-runtime.patch"
+      - "pythonlib/tests/test_studio_kasm_gateway.py: required KasmVNC, rejected retired selection and cancelled stream cleanup"
+      - "service-tester/studio_kasm_gateway_tests.py: sustained pointer motion and idle viewing in the sole Vue console with Firefox and Chromium clients"
+      - "service-tester/studio_kasm_client_tests.py: decoded image resources are closed in Firefox and Chromium"
+      - "https://github.com/kasmtech/KasmVNC/blob/17265facc40ab50db5740cdf0d12c61173edafc9/common/network/websocket.c"
+    rationale: >-
+      Multiple viewers require the corrected encoding cache. Private PID namespaces
+      reuse process IDs, so KasmVNC's PID-named abstract internal socket collides.
+      A separate network namespace hides that collision but makes Ubuntu 24.04
+      libX11 connect to an unrelated host abstract X11 display. Keep atomic
+      -displayfd allocation in the host network namespace, use the display's
+      private filesystem directory for internal IPC, and disable unused UDP
+      startup. Validate the installed source markers and executable digests;
+      an arbitrary upstream binary is not the certified Studio component.
+      The maintainer retired PNG streaming on 2026-10-16 (issue #13). Remote
+      execution requires verified KasmVNC on Linux; missing or invalid components
+      fail startup. Remove backend selection and the Windows capture worker;
+      retain common native input, authorization and browser ownership. Cancellation
+      must complete upstream and paired-channel cleanup before releasing the viewer.
+      The pinned WebSocket decoder ignores Ping without a Pong response. Disable
+      protocol Ping only on the private Unix-socket upstream; retain browser-facing
+      heartbeats, bounded writes and native process monitoring. Sustained motion
+      and idle regression checks must outlast the former 20s Ping + 20s timeout.
+      Coalesce available RFB bytes in a bounded 64 KiB buffer before each authorized
+      send; querying permissions per tiny upstream frame can starve relay reads.
+      Preserve byte order, revocation checks, size/rate limits and write deadlines.
+      The client releases decoded frames and bitmaps after rendering or discarding
+      them, including disposal; closing ImageDecoder does not release its output.
+
+  - id: studio-kasmvnc-loads-exact-ffmpeg-abi-without-directory-scans
+    title: KasmVNC resolves FFmpeg through the dynamic linker using the build ABI
+    check: manual
+    evidence:
+      - "https://github.com/kasmtech/KasmVNC/blob/17265facc40ab50db5740cdf0d12c61173edafc9/common/rfb/ffmpeg.cxx: the upstream loader recursively enumerates system library trees before dlopen"
+      - "https://man7.org/linux/man-pages/man3/dlopen.3.html: a SONAME without a slash uses the system dynamic linker's search and cache"
+      - "scripts/data/studio-kasmvnc-ffmpeg-test.cxx: actual loader with directory enumeration denied, exact header-derived ABI names and missing-library failures"
+    rationale: >-
+      Display readiness must not depend on enumerating unrelated system files.
+      Open each library's ABI-major SONAME from its build headers directly;
+      substring matching and directory traversal can select an incompatible
+      library and make cold startup depend on directory order and cache state.
+      Do not guess another ABI, rely on unversioned development symlinks,
+      prewarm a display or extend the readiness timeout to hide the scan.
+      Bind the correction to its own manifest digest and a new runtime version;
+      old installations require an explicit new-directory build and service update.
+
+  - id: studio-native-python-prefix-mounts
+    title: Isolated Python workers retain both their environment and interpreter prefixes
+    check: manual
+    evidence:
+      - "pythonlib/tests/test_studio_native.py: base interpreter and version-alias mounts exclude the parent home"
+      - "WSL CPython 3.12.15 managed by uv: missing version alias caused bwrap execvp ENOENT; isolated module import succeeds after binding both prefixes"
+    rationale: >-
+      A virtual environment's executable may link through a version alias to a
+      managed interpreter under the host home. The worker namespace hides that
+      home, so mounting only the environment or resolved interpreter is insufficient.
+      Bind the configured interpreter prefix and its resolved base prefix read-only
+      for both input workers and the KasmVNC relay, without exposing their parent home.
+
+  - id: studio-kasmvnc-source-archives-are-byte-pinned
+    title: KasmVNC source archives retain strict SHA256 verification across cold downloads
+    check: manual
+    evidence:
+      - "ci/tests/test_studio_kasmvnc_installer.py: verified downloads, corrupt-cache rejection and timestamped Gitiles URL regression"
+      - "https://github.com/google/gitiles/issues/217"
+      - "https://chromium.googlesource.com/libyuv/libyuv/+/eb6e7bb63738e29efd82ea3cf2a115238a89fa51"
+      - "2026-10-16: repeated Gitiles downloads had different archive hashes and identical source contents; all 159 file contents and executable flags matched the pinned GitHub mirror archive"
+    rationale: >-
+      Gitiles assigns download-time tar timestamps, so a raw archive hash cannot
+      pin its generated output. Download the same libyuv revision from the mirror
+      after checking its files against the official source. Record the official
+      commit/tree and the exact mirror archive SHA256. Do not change source
+      revision, accept arbitrary hashes, bypass integrity checks or retry until
+      a mutable archive happens to match an old cached download.
+
+  - id: studio-native-ci-uses-scoped-userns-policy
+    title: Native CI grants bubblewrap its distribution policy without disabling host namespace restrictions
+    check: manual
+    evidence:
+      - "https://documentation.ubuntu.com/release-notes/23.10/"
+      - "Ubuntu 24.04 apparmor-profiles 4.0.1really4.0.1-0ubuntu0.24.04.9: extra-profiles/bwrap-userns-restrict"
+      - "2026-10-16 GitHub Ubuntu runner: production namespace command failed with bwrap setting up uid map Permission denied before a display could start"
+      - ".github/workflows/tests.yml: load the distribution profile and run the exact production namespace command"
+    rationale: >-
+      The default Ubuntu restriction blocks an unprofiled bubblewrap from setting
+      its UID map. Load the distribution's bubblewrap profile on the fresh CI host,
+      then require the actual namespace command to succeed. Keep global namespace
+      restrictions enabled, retain capability dropping in child processes and run
+      every native test. Existing deployment policies require administrator review;
+      application startup and runtime installation must not silently rewrite them.
+
+  - id: studio-checkout-leases-are-exclusive-and-never-expire
+    title: A checked-out profile runs only on its lease holder until a verified return or forced release
+    check: manual
+    evidence:
+      - "pythonlib/tests/test_studio_checkouts.py: concurrent check-out and start, every gate, interrupted commits, forced release and withdrawn grants"
+      - "pythonlib/tests/test_studio_client_sync.py: redelivered leases preserve local data and shared proxy credentials outlive individual leases"
+      - "pythonlib/tests/test_studio_client_local.py: shutdown drains transfers and uncertain cleanup fences heartbeat recovery"
+      - "service-tester/studio_checkout_tests.py: real-browser returns, offline recovery, withdrawn grants and forced release"
+      - "https://support.gologin.com/en/articles/14404855-profile-synchronization: close and synchronize profiles before changing devices"
+    rationale: >-
+      A profile has at most one active lease, decided in the same write
+      transaction as run reservations. Leases are not durable runs: run
+      ownership requires every unstopped run to belong to one service owner.
+      A missed heartbeat never expires a lease, because the server cannot tell
+      whether a disconnected client stopped its browser; only a committed
+      return or an administrator release ends it, and released tokens are
+      rejected. Starts, edits, deletion, identity rebuilds, snapshots and
+      migration preparation refuse an active lease or unfinished commit;
+      configuration copies remain allowed. A return assembles and verifies the
+      complete manifest in staging on the workspace filesystem, records the
+      commit durably, then swaps the directory; startup rolls recorded commits
+      forward. Re-delivery of the same lease cannot overwrite local changes or
+      reset a pending commit. Client shutdown rejects new work and waits for
+      admitted foreground operations and in-flight transfer threads before
+      unlocking the cache; cancelling a caller cannot abandon those threads.
+      Uncertain browser cleanup fences
+      heartbeat retries as well as stop callbacks. Shared proxy credentials
+      remain until their last local lease ends.
+      A withdrawn grant asks the client to return the data rather
+      than discarding it. Identity claims use the server ledger. Check-out
+      payloads, proxy passwords and tokens are plaintext over HTTP.
+
+  - id: studio-profiles-select-exact-kernels
+    title: Profiles retain exact browser builds independently of the new-profile default
+    check: manual
+    evidence:
+      - "pythonlib/tests/test_studio_kernels.py: exact selection, historical ambiguity, persistent defaults, data preservation and quarantine"
+      - "pythonlib/tests/test_studio_engine.py: two profiles select and record distinct builds despite a global executable path"
+      - "pythonlib/tests/test_studio_kernel_cache.py: four-platform digest verification, missing-digest rejection and referenced-kernel retention"
+    rationale: >-
+      The server caches official packages for all four client platforms and
+      accepts only assets with a published SHA-256; an unsigned asset cannot be
+      told apart from a replaced one. A kernel any profile, identity or the
+      new-profile default references is never deleted.
+      A team launch uses the identity's complete repository/version/build ID,
+      or the profile's selected kernel before identity generation. Historical
+      version-only identities require one matching installed build. Missing or
+      ambiguous builds fail; global activation and development executable paths
+      cannot substitute another team kernel. Changing the default affects new
+      profiles only. Explicit kernel changes reset identity but retain website
+      data. Backup digests include the default and initialization never rewrites
+      quarantined or retired workspaces.
+
+  - id: studio-desktop-requires-team-server
+    title: Studio ships a server-connected desktop client without a separate serverless product
+    check: manual
+    evidence:
+      - "docs/studio-client-server.md section 7.6: maintainer scope decision confirmed on 2026-10-17"
+    rationale: >-
+      Local execution is already provided by the desktop's checkout and return
+      workflow. Maintain one server-connected desktop product rather than a
+      second standalone application, project directory, installer or update
+      channel. The client does not embed another team server. Server workspaces
+      and client checkout caches remain separate writable stores; shared folders
+      or external synchronization cannot replace exclusive checkout ownership.
+      This product scope does not remove the standalone Python launcher APIs.
+
+  - id: studio-macos-crypto-links-openssl-statically
+    title: Source-built macOS cryptography must not depend on a second OpenSSL ABI
+    check: manual
+    evidence:
+      - "https://cryptography.io/en/latest/installation/#building-cryptography-on-macos: OPENSSL_STATIC source-build configuration"
+      - "pythonlib/tests/test_studio_packaging.py: dependency notices exclude similarly named PyObjC test binaries"
+    rationale: >-
+      A source-built cryptography can dynamically link a different OpenSSL from
+      Python. The freezer collects libraries with the same basename, leaving the
+      extension bound to an incompatible ABI. Build the dependency statically,
+      as upstream wheels do, instead of replacing a bundled library after freezing.
+      Every platform retains the frozen runtime check before installer creation.
+
+  - id: studio-systemd-keyring-is-persistent-and-fails-closed
+    title: The non-login server account unlocks a private native keyring before serving requests
+    check: manual
+    evidence:
+      - "https://keyring.readthedocs.io/en/stable/#using-keyring-on-headless-linux-systems"
+      - "https://github.com/systemd/systemd/blob/v255/man/systemd-creds.xml: host-bound encryption and standard-input credentials"
+      - "https://github.com/GNOME/gnome-keyring/blob/46.1/daemon/gkd-main.c: read_login_password preserves standard-input newlines as password bytes"
+      - "pythonlib/tests/test_studio_systemd.py: adopted unlock credentials retain all bytes, including newlines"
+      - "pythonlib/tests/test_studio_server_install.py: encrypted provisioning, existing-key preservation and explicit adoption"
+      - "pythonlib/tests/test_studio_systemd.py: private session, persistent collection, bounded checks and redacted failure"
+      - "service-tester/studio_credentials_tests.py: real systemd delivery, restart persistence, wrong-key rejection and recovery"
+      - "service-tester/studio_server_lifecycle_tests.py: actual team entrypoint, HTTP proxy credentials, restart persistence and clean lock release"
+    rationale: >-
+      A system service has no graphical login to unlock Secret Service. Install
+      a dedicated D-Bus session and native login keyring, and pass its random
+      unlock key through systemd encrypted credentials and daemon stdin, never
+      arguments, environment values or plaintext files. Preserve the exact adopted
+      password bytes, including trailing newlines; trimming changes the password.
+      Check persistent native storage before serving requests; failure cannot select a volatile or
+      plaintext backend. Upgrades retain the key and keyring, and an existing
+      keyring without its managed key requires explicit administrator adoption.
+      The host key supports VMs without TPM but does not protect against root or
+      access to the complete host disk. The bootstrap execs the existing team
+      entrypoint to preserve supervisor identity and clean shutdown ordering;
+      systemd owns the credential daemon lifetimes. A credential-session check
+      does not certify a fresh server installation or whole-machine reboot.

@@ -1,0 +1,37 @@
+TigerBrowser 桌面客户端
+
+本程序是 TigerBrowser 团队服务器的桌面客户端，必须连接服务器使用，不提供独立本机模式。
+首次打开时填写服务器地址，须与服务器启动参数 --origin 完全一致，例如 http://192.168.1.10:8766。
+连接后显示服务器的管理界面，使用管理员分配的成员账号登录；登录状态按服务器分别保存到过期。
+
+安装：
+- Windows 10/11 x64：运行 .exe 安装程序，安装到当前用户的 %LOCALAPPDATA%\Programs\TigerBrowser，
+  无需管理员权限。安装包未签名，首次运行会出现 SmartScreen 提示。
+- macOS：打开 .dmg，把 TigerBrowser.app 拖入“应用程序”。未签名公证，首次请右键选择“打开”。
+- Ubuntu 24.04 x64：用软件安装器或 sudo apt install ./安装包.deb 安装，程序位于 /opt/tigerbrowser-client。
+Windows 安装目录中的 _internal\TigerBrowserRuntime.exe 是后台辅助程序，请勿直接运行。
+
+本包包含 Qt 网页内核、默认扩展、固定指纹模型，不包含浏览器内核。
+有“本机运行”授权时，选中环境点击“本机启动”：客户端签出环境，从服务器下载变化的数据和
+该环境固定版本的内核并校验摘要，在本机运行；关闭浏览器或点击“停止本机”后自动签回。
+签出期间服务器和其他电脑不能运行或编辑该环境。
+
+本机数据按服务器分别保存在系统用户数据目录的 TigerBrowser/servers/<工作区 ID>/ 下
+（Windows 为 %LOCALAPPDATA%\TigerBrowser），只包含签出过的环境、本设备标识和本机设置。
+代理密码在签出期间保存在系统凭据库（Windows 凭据管理器、macOS 钥匙串或 Secret Service），签回后删除。
+“本机”页显示待签回的环境、失效副本、本机设置和本地自动化接口的连接文件位置。
+管理员强制解锁后，本机未签回的数据移入缓存的 stale 目录，不能再签回或启动。
+退出时仍有本机运行的环境会先提示；签回失败的环境保留为待签回，下次启动时继续。
+
+更新：服务器提供新版本时，“客户端下载”页提示更新。关闭本机运行的环境后点击“下载并安装”，
+客户端校验安装包摘要后退出：Windows 后台安装并重新打开，macOS 替换应用后重新打开
+（应用目录不可写时打开磁盘映像），Ubuntu 打开软件安装器。客户端版本与服务器不兼容时只显示下载页。
+本机缓存不在程序目录中，更新和卸载都不影响它。安装包不包含任何环境、Cookie、本机缓存或代理凭据。
+
+使用 HTTP 连接时，密码、会话、网站数据、代理密码和客户端安装包在局域网内以明文传输，
+安装包与摘要可能被同一网络上的第三方一起替换；需要保密时请服务器启用 HTTPS。
+
+项目源代码与许可证：https://github.com/zhaotianshi/TigerBrowser
+Camoufox 上游：https://github.com/daijro/camoufox
+默认扩展源代码与许可证：https://github.com/gorhill/uBlock
+Python 依赖的许可证在 licenses 目录中。

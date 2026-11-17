@@ -1,0 +1,17 @@
+{
+  "package": "@fontsource/noto-sans-sc",
+  "version": "5.2.9",
+  "license": "OFL-1.1",
+  "assets": [
+    {
+      "name": "noto-sans-sc.woff2",
+      "url": "https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.2.9/files/noto-sans-sc-chinese-simplified-400-normal.woff2",
+      "sha256": "95e3633b6a98f764ba3adfb54504a0cd4799328c009adf9081d6c1850f9c4c78"
+    },
+    {
+      "name": "noto-sans-sc.LICENSE",
+      "url": "https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.2.9/LICENSE",
+      "sha256": "18aabf190848725e2576eefb5c29ba06aac1029d02132252a7f312eac2e50cf3"
+    }
+  ]
+}

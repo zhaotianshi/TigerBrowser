@@ -1,0 +1,12 @@
+{
+  "name": "@camoufox/studio-kasm-client-build",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "pako": "2.1.0"
+  }
+}

@@ -1,0 +1,81 @@
+annotated-doc==0.0.5
+annotated-types==0.8.0
+ansicon==1.89.0 ; sys_platform == 'win32'
+anyio==4.15.1
+backports-tarfile==1.2.0 ; python_full_version < '3.12'
+blessed==1.50.0
+certifi==2026.7.22
+cffi==2.1.1 ; platform_python_implementation != 'PyPy'
+charset-normalizer==3.5.2
+click==8.5.0
+colorama==0.4.6 ; sys_platform == 'win32'
+cryptography==50.0.2
+cython==3.3.0 ; sys_platform == 'darwin'
+editor==2.0.1
+exceptiongroup==1.3.1 ; python_full_version < '3.11'
+fastapi==0.142.2
+fpgen==1.3.0
+greenlet==3.5.6
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.20
+importlib-metadata==9.0.1 ; python_full_version < '3.12'
+indexed-zstd==1.7.1
+inquirer==3.4.1
+jaraco-classes==3.4.0
+jaraco-context==6.1.2
+jaraco-functools==4.6.0
+jeepney==0.9.0 ; sys_platform == 'linux'
+jinxed==2.1.0
+keyring==25.7.0
+language-tags==1.3.1
+markdown-it-py==4.2.0
+maxminddb==3.2.0
+mdurl==0.1.2
+more-itertools==11.1.0
+numpy==2.2.6 ; python_full_version < '3.11'
+numpy==2.4.6 ; python_full_version == '3.11.*'
+numpy==2.5.3 ; python_full_version >= '3.12'
+opentelemetry-api==1.45.0
+orjson==3.12.0
+platformdirs==4.12.2
+playwright==1.62.0
+psutil==7.2.2
+pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
+pydantic==2.13.5
+pydantic-core==2.46.5
+pyee==13.0.1
+pygments==2.21.0
+pyobjc-core==12.2.2 ; sys_platform == 'darwin'
+pyobjc-framework-cocoa==12.2.2 ; sys_platform == 'darwin'
+pyside6==6.11.2
+pyside6-addons==6.11.2
+pyside6-essentials==6.11.2
+pysocks==1.7.1
+python-xlib==0.33 ; sys_platform == 'linux'
+pywin32-ctypes==0.2.3 ; sys_platform == 'win32'
+pyyaml==6.0.3
+readchar==4.2.2
+requests==2.34.2
+rich==15.0.0
+rich-click==1.9.9
+runs==1.3.0
+screeninfo==0.8.1
+secretstorage==3.5.0 ; sys_platform == 'linux'
+shiboken6==6.11.2
+six==1.17.0 ; sys_platform == 'linux'
+starlette==1.7.0
+tomli==2.4.1 ; python_full_version < '3.11'
+typing-extensions==4.16.0
+typing-inspection==0.4.4
+tzdata==2026.5
+ua-parser==1.0.2
+ua-parser-builtins==202610
+urllib3==2.8.0
+uvicorn==0.54.0
+wcwidth==0.9.1
+websockets==15.0.1
+xmod==1.10.0
+zipp==4.1.1 ; python_full_version < '3.12'
+zstandard==0.25.0

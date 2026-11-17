@@ -1,0 +1,48 @@
+{
+  "version": "1.5.0+studio.2",
+  "upstream_revision": "17265facc40ab50db5740cdf0d12c61173edafc9",
+  "cache_fix_revision": "a05a0984f55d4aa4de15b001f581c5015c177d78",
+  "private_ipc_fix_sha256": "fdf37afdf4fcb222df3b7408636055f4dd7836e3d4dd738098907bfcaf4733c8",
+  "ffmpeg_loader_fix_sha256": "8c608355ceec16713aec8650bb06e31db2682ec7feb88c3e66fa8c3aa75bc04f",
+  "sources": {
+    "kasmvnc": {
+      "url": "https://codeload.github.com/kasmtech/KasmVNC/tar.gz/17265facc40ab50db5740cdf0d12c61173edafc9",
+      "sha256": "478f4d6a973fc6f51cc5c711d37ff3ba30007792e481a7074cc5e5ce63f2eca1"
+    },
+    "cache-fix": {
+      "url": "https://codeload.github.com/kasmtech/KasmVNC/tar.gz/a05a0984f55d4aa4de15b001f581c5015c177d78",
+      "sha256": "3bb3de900a2c506d49017831b3d673acbb57f71ac7032a9648f75e7a86386ad0"
+    },
+    "xorg": {
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/x/xorg-server/xorg-server_21.1.12.orig.tar.gz",
+      "sha256": "f76a5878b0e6d16415cf0cd24ffc21090845fef3bc4ada45e57ea86b6c8fb75b"
+    },
+    "jpeg": {
+      "url": "https://codeload.github.com/libjpeg-turbo/libjpeg-turbo/tar.gz/7723f50f3f66b9da74376e6d8badb6162464212c",
+      "sha256": "8d5b47e76090d2124b56c2e3abc195d0d1a71b68b644530a06dad02e10490daf"
+    },
+    "webp": {
+      "url": "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.5.0.tar.gz",
+      "sha256": "7d6fab70cf844bf6769077bd5d7a74893f8ffd4dfb42861745750c63c2a5c92c"
+    },
+    "tbb": {
+      "url": "https://codeload.github.com/uxlfoundation/oneTBB/tar.gz/45587e94dfb6dfe00220c5f520020a5bc745e92f",
+      "sha256": "09bc25fb43ecb903d23d90822255c7c65ebfae1d24caffc28fbff8971ad72a57"
+    },
+    "cpuid": {
+      "url": "https://codeload.github.com/anrieff/libcpuid/tar.gz/018a05372d1cf2b4b9c18192da6f203521a23460",
+      "sha256": "45571758f55d0a2f8480f0fef9ecf41edcdb6ecc8842106a0f655c4436f4b338"
+    },
+    "fmt": {
+      "url": "https://codeload.github.com/fmtlib/fmt/tar.gz/123913715afeb8a437e6388b4473fcc4753e1c9a",
+      "sha256": "95f89f1eb3b53478417185afc0b7e3d40ec889687af86e890da20068534d29f7"
+    },
+    "yuv": {
+      "url": "https://codeload.github.com/lemenkov/libyuv/tar.gz/eb6e7bb63738e29efd82ea3cf2a115238a89fa51",
+      "sha256": "0442ca69a608985bd8c220d9decfa9eba8331a2791957fcd2bec94a654b10562",
+      "upstream": "https://chromium.googlesource.com/libyuv/libyuv",
+      "revision": "eb6e7bb63738e29efd82ea3cf2a115238a89fa51",
+      "tree": "3620ac92d6b7fb74659686b1dde7e22d97ee60f1"
+    }
+  }
+}

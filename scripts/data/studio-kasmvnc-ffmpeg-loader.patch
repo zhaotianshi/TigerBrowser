@@ -1,0 +1,80 @@
+diff --git a/common/rfb/ffmpeg.cxx b/common/rfb/ffmpeg.cxx
+--- a/common/rfb/ffmpeg.cxx
++++ b/common/rfb/ffmpeg.cxx
+@@ -17,37 +17,18 @@
+  */
+ 
+ #include "ffmpeg.h"
+-#include <array>
+-#include <filesystem>
++#include <stdexcept>
+ #include "LogWriter.h"
+ 
+ static rfb::LogWriter vlog("ffmpeg");
+ 
+ FFmpeg::FFmpeg() {
+ 
+-    static constexpr std::array<std::string_view, 2> paths = {"/usr/lib/", "/usr/lib64"};
+-
+-    namespace fs = std::filesystem;
+     using namespace std::string_literals;
+ 
+     auto load_lib = [](auto *lib) {
+-        void *handle{};
+-        for (const auto &dir: paths) {
+-            if (!fs::exists(dir) || !fs::is_directory(dir))
+-                continue;
+-
+-            for (const auto &entry: fs::recursive_directory_iterator(dir)) {
+-                if (!entry.is_regular_file())
+-                    continue;
+-
+-                const std::string filename = entry.path().filename().string();
+-                if (filename.find(lib) != std::string::npos) {
+-                    handle = dlopen(filename.c_str(), RTLD_LAZY);
+-
+-                    break;
+-                }
+-            }
+-        }
++        // Let the dynamic linker resolve the exact build ABI without scanning unrelated files.
++        void *handle = dlopen(lib, RTLD_LAZY);
+ 
+         if (!handle)
+             throw std::runtime_error("Could not open "s + lib);
+@@ -57,7 +38,7 @@
+ 
+     // libavformat
+     try {
+-        libavformat = load_lib("libavformat.so");
++        libavformat = load_lib("libavformat.so." STR(LIBAVFORMAT_VERSION_MAJOR));
+         auto handle = libavformat.get();
+ 
+         avformat_open_input_f = D_LOOKUP_SYM(handle, avformat_open_input);
+@@ -71,7 +52,7 @@
+         vlog.debug("libavformat.so loaded");
+ 
+         // libavutil
+-        libavutil = load_lib("libavutil.so");
++        libavutil = load_lib("libavutil.so." STR(LIBAVUTIL_VERSION_MAJOR));
+         handle = libavutil.get();
+ 
+         av_frame_free_f = D_LOOKUP_SYM(handle, av_frame_free);
+@@ -95,7 +76,7 @@
+         vlog.debug("libavutil.so loaded");
+ 
+         // libswscale
+-        libswscale = load_lib("libswscale.so");
++        libswscale = load_lib("libswscale.so." STR(LIBSWSCALE_VERSION_MAJOR));
+         handle = libswscale.get();
+ 
+         sws_freeContext_f = D_LOOKUP_SYM(handle, sws_freeContext);
+@@ -104,7 +85,7 @@
+         vlog.debug("libswscale.so loaded");
+ 
+         // libavcodec
+-        libavcodec = load_lib("libavcodec.so");
++        libavcodec = load_lib("libavcodec.so." STR(LIBAVCODEC_VERSION_MAJOR));
+         handle = libavcodec.get();
+ 
+         avcodec_version_f = D_LOOKUP_SYM(handle, avcodec_version);

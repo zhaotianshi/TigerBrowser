@@ -1,0 +1,2 @@
+# Build-time freezer; application dependencies remain in studio-requirements.lock.
+pyinstaller==6.22.3

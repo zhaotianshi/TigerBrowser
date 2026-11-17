@@ -1,0 +1,50 @@
+name: Package Studio client
+description: Build and verify the native installer with locked public prerequisites
+inputs:
+  platform:
+    description: Client platform selected by the shared release matrix
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/build-studio-frontend
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Statically link source-built macOS cryptography
+      if: startsWith(inputs.platform, 'mac-')
+      shell: bash
+      run: |
+        echo "OPENSSL_DIR=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
+        echo 'OPENSSL_STATIC=1' >> "$GITHUB_ENV"
+    - run: python -m pip install -r pythonlib/studio-requirements.lock -r pythonlib/studio-build-requirements.lock
+      shell: bash
+    - run: python -m pip install --no-deps -e './pythonlib[studio]'
+      shell: bash
+    - run: python scripts/pin-fpgen-model.py
+      shell: bash
+    - run: python -c "from camoufox.addons import DefaultAddons, maybe_download_addons; maybe_download_addons(list(DefaultAddons))"
+      shell: bash
+    - name: Install the pinned Inno Setup compiler
+      if: inputs.platform == 'win-x86_64'
+      shell: pwsh
+      env:
+        INNO_SETUP_URL: https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe
+        INNO_SETUP_SHA256: 9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732
+      run: |
+        Invoke-WebRequest $env:INNO_SETUP_URL -OutFile "$env:RUNNER_TEMP\innosetup.exe"
+        if ((Get-FileHash "$env:RUNNER_TEMP\innosetup.exe" -Algorithm SHA256).Hash -ne $env:INNO_SETUP_SHA256) { throw 'Inno Setup digest mismatch' }
+        Start-Process "$env:RUNNER_TEMP\innosetup.exe" -WindowStyle Hidden -Wait -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "/DIR=$env:RUNNER_TEMP\inno"
+    - if: inputs.platform == 'win-x86_64'
+      shell: pwsh
+      run: python scripts/package-studio.py --iscc "$env:RUNNER_TEMP\inno\ISCC.exe"
+    - if: startsWith(inputs.platform, 'mac-')
+      shell: bash
+      run: python scripts/package-studio.py
+    - name: Build the Ubuntu package with a session keyring
+      if: inputs.platform == 'lin-x86_64'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y desktop-file-utils dbus-x11 $(python -c "import runpy; print(' '.join(runpy.run_path('scripts/package-studio.py')['DEB_DEPENDS']))")
+        dbus-run-session -- bash -c 'printf "" | gnome-keyring-daemon --unlock --components=secrets >/dev/null && python scripts/package-studio.py'
