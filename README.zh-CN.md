@@ -143,7 +143,7 @@ bash start-studio.sh
 
 ## 客户端安装包
 
-正式安装包在 [GitHub Releases](https://github.com/zhaotianshi/TigerBrowser/releases) 提供下载。
+[GitHub Releases](https://github.com/zhaotianshi/TigerBrowser/releases) 的每个正式版本都会列出该版本合并的 PR，并提供各平台安装包。
 
 成员通常从服务器的“客户端下载”页安装打包好的客户端：Windows 10/11 x64 为按当前用户安装的 Inno Setup 程序（无需管理员权限），macOS arm64/x86_64 为 `.dmg`，Ubuntu 24.04 x64 为 `.deb`。安装包包含 Python、Qt（含 QtWebEngine）、Playwright 驱动、指纹模型、默认扩展；浏览器内核不随包分发，本机运行时按环境从服务器取得。安装包未签名，Windows 首次运行会出现 SmartScreen 提示，macOS 需右键选择“打开”。代理资源支持 HTTP、HTTPS 和 SOCKS5，可逐行批量导入；参数与限制见[网络连接说明](docs/studio-nodes.md)。
 

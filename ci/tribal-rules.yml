@@ -44,13 +44,15 @@ rules:
       - "ci/tests/test_workflows.py: artifact-free source checks retain the full four-platform gate and share the release packager"
       - "ci/tests/test_studio_release.py: exact-source CI, draft ownership and complete digest-verified platform sets"
       - "docs/studio-releases.md: publication rules, capacity handling and explicit source-only updates"
+      - "https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes: merged pull requests in generated notes"
     rationale: >-
       Artifact quota cannot become a dependency of code verification. Source jobs
       build their own locked frontend and retain all four native installer checks
       without uploading Actions artifacts. Only an explicit release workflow may
-      write a source-bound draft. Every platform and downloaded digest must verify
-      before publication; failed or unavailable publication leaves source updates
-      independent, never a fabricated successful release or a raised spending limit.
+      write a source-bound draft listing the PRs merged for that version. Every
+      platform and downloaded digest must verify before publication. Failed or
+      unavailable publication leaves source updates independent, never a fabricated
+      successful release or a raised spending limit.
 
   # -------------------------------------------------------------------------
   # Virtual display
