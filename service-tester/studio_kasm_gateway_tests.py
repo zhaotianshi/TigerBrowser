@@ -12,17 +12,28 @@ from camoufox.studio.team.kasm import prerequisites
 from studio_runtime_tests import command, login, running_team, site_state, workspace
 
 
-async def decoded_color(canvas, expected):
+async def decoded_color(canvas, expected, *, point=(500, 900)):
     async def painted():
         while True:
-            color = await canvas.evaluate('''surface => {
-                const canvas = surface;
-                return Array.from(canvas.getContext('2d').getImageData(500,900,1,1).data);
-            }''')
-            if len(color) == 4 and all(abs(a - b) < 10 for a, b in zip(color, [*expected, 255])):
-                return
+            match = await canvas.evaluate('''(canvas, [expected, point]) => {
+                const [left, top] = point || [0, 0];
+                const [width, height] = point ? [1, 1] : [canvas.width, canvas.height];
+                const pixels = canvas.getContext('2d').getImageData(left, top, width, height).data;
+                const step = point ? 1 : 8;
+                for (let y = 0; y < height; y += step) {
+                    for (let x = 0; x < width; x += step) {
+                        const offset = 4 * (y * width + x);
+                        if (expected.every((value, channel) => Math.abs(value - pixels[offset + channel]) < 10)) {
+                            return [left + x, top + y];
+                        }
+                    }
+                }
+                return null;
+            }''', [[*expected, 255], point])
+            if match is not None:
+                return match
             await asyncio.sleep(.05)
-    await asyncio.wait_for(painted(), 10)
+    return await asyncio.wait_for(painted(), 10)
 
 
 async def fitted_viewport(canvas):
@@ -54,6 +65,12 @@ async def test_console_display_native_text_and_reconnect(workspace, tmp_path):
             native = service.engine.sessions[profile['id']]
             page = native.context.pages[0]
             await page.goto(origin + '/synthetic-native')
+            input_color = [204, 38, 112]
+            await page.locator('#native').evaluate('''(input, color) => {
+                input.style.top = '72px';
+                input.style.bottom = 'auto';
+                input.style.backgroundColor = 'rgb(' + color.join(',') + ')';
+            }''', input_color)
             await page.evaluate("document.body.style.background = 'rgb(228,244,236)'")
             identity = store.get_profile(profile['id'])['identity']
             async with async_playwright() as playwright:
@@ -100,9 +117,11 @@ async def test_console_display_native_text_and_reconnect(workspace, tmp_path):
                     await claim.click()
                     active = client.get_by_text('你正在控制', exact=False)
                     await expect(active.first).to_contain_text('你正在控制', timeout=5000)
+                    # Locate the input in the decoded display, independent of browser chrome geometry.
+                    x, y = await decoded_color(canvas, input_color, point=None)
                     box = await canvas.bounding_box()
-                    await client.mouse.click(box['x'] + box['width'] * 150 / 1920,
-                                             box['y'] + box['height'] * 1035 / 1080)
+                    await client.mouse.click(box['x'] + box['width'] * x / 1920,
+                                             box['y'] + box['height'] * y / 1080)
                     await expect(page.locator('#native')).to_be_focused()
                     text = '中文远程输入验证 Studio'
                     field = client.locator('textarea[placeholder^="粘贴链接"]')

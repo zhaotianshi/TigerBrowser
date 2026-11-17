@@ -271,7 +271,10 @@ async def console_login(page, origin):
     await page.goto(origin)
     await page.locator('.login-form').get_by_label('用户名', exact=True).fill('root')
     await page.locator('.login-form').get_by_label('密码', exact=True).fill('synthetic-admin-password')
-    await page.get_by_role('button', name='登录控制台', exact=True).click()
+    async with page.expect_response(lambda response: response.url == origin + '/team/v1/login'
+                                    and response.request.method == 'POST') as login_response:
+        await page.get_by_role('button', name='登录控制台', exact=True).click()
+    assert (await login_response.value).ok
     await expect(page.locator('.connection-status')).to_have_text('实时同步 · 正常')
 
 
