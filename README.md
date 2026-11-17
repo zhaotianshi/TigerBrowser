@@ -35,7 +35,9 @@ In **浏览器环境** (Browser Profiles), choose **创建环境** (Create Profi
 
 ## Desktop client
 
-See the [client installation and build guide](docs/studio.md#client-packages) for Windows x64, macOS and Ubuntu x64. At first launch, enter the server address exactly as configured by its `--origin` option. The desktop displays the server's console. Apply console updates by updating and restarting the team server.
+Official downloads for Windows x64, macOS and Ubuntu x64 are listed on [GitHub Releases](https://github.com/zhaotianshi/TigerBrowser/releases). See the [client installation and build guide](docs/studio.md#client-packages).
+
+At first launch, enter the server address exactly as configured by its `--origin` option. The desktop displays the server's console. Apply console updates by updating and restarting the team server.
 
 ## Documentation
 
