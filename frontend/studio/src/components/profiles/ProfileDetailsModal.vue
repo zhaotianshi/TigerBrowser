@@ -196,7 +196,7 @@ async function onRebuildIdentity() {
           <div class="identity-info-grid">
             <div class="info-row">
               <span class="info-k">浏览器版本:</span>
-              <span class="info-v">{{ identityData.browser_version || 'Camoufox' }}</span>
+              <span class="info-v">{{ identityData.browser_version || '未记录' }}</span>
             </div>
             <div class="info-row">
               <span class="info-k">屏幕分辨率:</span>

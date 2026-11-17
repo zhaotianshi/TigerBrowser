@@ -62,7 +62,7 @@ const connectionText = computed(() => {
 <template>
   <aside class="sidebar">
     <div class="sidebar-brand">
-      <div class="brand-logo">C</div>
+      <div class="brand-logo" aria-hidden="true">T</div>
       <div class="brand-info">
         <span class="brand-name">TigerBrowser</span>
         <span class="brand-sub">工作区</span>

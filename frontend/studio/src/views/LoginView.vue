@@ -44,7 +44,7 @@ async function onSubmit() {
     <div class="login-container">
       <!-- Brand -->
       <div class="login-brand">
-        <div class="brand-logo">C</div>
+        <div class="brand-logo" aria-hidden="true">T</div>
         <h1 class="brand-title">TigerBrowser</h1>
         <p class="brand-subtitle">团队控制台 · 执行机环境工作区</p>
       </div>

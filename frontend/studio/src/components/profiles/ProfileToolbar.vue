@@ -26,11 +26,12 @@ import {
 import { useDesktopStore } from '../../stores/desktop'
 import { Laptop, Unlock } from 'lucide-vue-next'
 import { generateRequestId } from '../../types/api'
+import type { ProfileSummary } from '../../types/profile'
 import { openProfileWindow } from '../../utils/profile-window'
 
 const props = defineProps<{
   onEdit: () => void
-  onDetails: () => void
+  onDetails: (profile: ProfileSummary) => void
   onDelete: () => void
   onCookies: () => void
 }>()
@@ -313,7 +314,7 @@ function onOpenRemote() {
           size="compact"
           :disabled="count !== 1"
           title="查看环境指纹及完整元数据"
-          @click="props.onDetails"
+          @click="single && props.onDetails(single)"
         >
           <Info :size="14" />
           <span>详情</span>

@@ -155,6 +155,11 @@ cannot claim an identity already recorded on the server.
 
 ## Client packages
 
+The desktop displays the console served by the team server. To apply console
+fixes such as profile details, update the team server's wheel or source checkout
+and restart its service. Installing a new desktop package alone does not update
+the pages served by an existing server.
+
 Members normally install a packaged client from the server's **客户端下载**
 page instead of a source checkout. Each package contains Python, Qt with
 QtWebEngine, Playwright's driver, the verified fpgen model, the default

@@ -2,13 +2,14 @@
 
 import json
 import os
+import zipfile
 from uuid import uuid4
 
 import pytest
 from cryptography.cobblestone import Cobblestone128Encryptor
 
 from camoufox.studio import backup
-from camoufox.studio.store import ProfileStore, StoreError
+from camoufox.studio.store import ProfileStore, StoreError, ValidationError
 from camoufox.studio.workspace import WorkspaceLock, WorkspaceLockError
 
 
@@ -70,7 +71,6 @@ def test_restore_discards_api_keys_with_their_sessions(workspace, tmp_path):
 def test_previous_schema_snapshot_is_verified_before_additive_migration(workspace, tmp_path):
     import hashlib
     import sqlite3
-    import zipfile
     key, archive, manifest = snapshot(workspace, tmp_path)
     plain = backup._decrypt(archive, key, tmp_path, backup.MAX_BYTES)
     with zipfile.ZipFile(plain) as original:
@@ -145,29 +145,38 @@ def test_recovery_receipts_cannot_hide_unrecognized_data(workspace, tmp_path, in
         snapshot(workspace, tmp_path)
 
 
-def test_extended_proxy_migration_lists_and_requires_all_authentication_fields(workspace, tmp_path, monkeypatch):
-    from camoufox.studio.store import parse_proxy_line
-    from camoufox.studio.secrets import KeyringSecretStore, SecretStoreError
+def test_legacy_chain_snapshot_preserves_requirements_without_enabling_the_route(workspace, tmp_path, monkeypatch):
+    from camoufox.studio.secrets import KeyringSecretStore
 
     secrets = {}
     monkeypatch.setattr(KeyringSecretStore, 'get', lambda self, name: secrets.get((self.namespace, name)))
     monkeypatch.setattr(KeyringSecretStore, 'set', lambda self, name, value: secrets.__setitem__((self.namespace, name), value))
-    monkeypatch.setattr(KeyringSecretStore, 'delete', lambda self, name: secrets.pop((self.namespace, name), None))
     store = workspace[0]
-    proxy = store.save_proxy(parse_proxy_line('hy2://backup-test-password@proxy.example:443?obfs=salamander&obfs-password=backup-obfs-test'))
+    password, node_secret = 'backup-test-password', 'backup-obfs-test'
+    proxy = store.save_proxy({'name': 'Legacy route', 'server': 'socks5://proxy.example:1080',
+                              'password': password})
+    # Older versions saved chain metadata in SQLite and its credentials in the keyring.
+    proxy['node'] = {'core': 'mihomo', 'proxies': [{'type': 'socks5'}]}
+    proxy['has_node_secret'] = True
+    store.secret_store.set(proxy['id'] + ':node_secret', node_secret)
+    with store._write() as (connection, _):
+        connection.execute('UPDATE proxies SET data = ? WHERE id = ?', (json.dumps(proxy), proxy['id']))
+
     key, target, manifest = snapshot(workspace, tmp_path)
-    fields = next(item['fields'] for item in manifest['credentials'] if item['id'] == proxy['id'])
-    assert 'node_secret' in fields
-    assert b'backup-obfs-test' not in target.read_bytes()
+    assert manifest['credentials'] == [{'id': proxy['id'], 'fields': ['password', 'node_secret']}]
+    plain = backup._decrypt(target, key, tmp_path, backup.MAX_BYTES)
+    with zipfile.ZipFile(plain) as archive:
+        for entry in archive.namelist():
+            content = archive.read(entry)
+            assert password.encode() not in content and node_secret.encode() not in content
+
     restored = backup.restore_snapshot(target, tmp_path / 'extended-restore', key)
     copy = ProfileStore(restored)
-    with pytest.raises(SecretStoreError):
-        copy.get_proxy(proxy['id'], True)
-    credentials = store.get_proxy(proxy['id'], True)
-    copy.save_proxy({'password': credentials['password'], 'node_secret': credentials['node_secret']}, proxy['id'])
-    revealed = copy.get_proxy(proxy['id'], True)
-    assert revealed['node_secret'] == credentials['node_secret']
-    assert 'backup-obfs-test' not in json.dumps(copy.export_config())
+    assert copy.get_proxy(proxy['id']) == proxy
+    assert copy.secret_store.get(proxy['id']) is None
+    assert copy.secret_store.get(proxy['id'] + ':node_secret') is None
+    with pytest.raises(ValidationError, match='unsupported node or chain'):
+        backup._verify_credentials(copy)
 
 
 @pytest.mark.parametrize('change', ['wrong_key', 'truncate', 'tamper', 'append'])

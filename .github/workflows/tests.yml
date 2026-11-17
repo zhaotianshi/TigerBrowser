@@ -186,7 +186,13 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a') as output:
               output.write('CAMOUFOX_STUDIO_BINARY=' + str(browser_executable()) + '\n')
           PY
-      - run: python -m pytest service-tester/studio_kasm_client_tests.py service-tester/studio_kasm_gateway_tests.py service-tester/studio_native_tests.py::test_last_native_tab_close_allows_restart_with_connected_viewer service-tester/studio_runtime_tests.py::test_web_console_recovers_after_service_restart service-tester/studio_runtime_tests.py::test_console_settings_and_timezone_choices_preserve_saved_values -q --timeout=240
+      - run: >-
+          python -m pytest service-tester/studio_kasm_client_tests.py service-tester/studio_kasm_gateway_tests.py
+          service-tester/studio_native_tests.py::test_last_native_tab_close_allows_restart_with_connected_viewer
+          service-tester/studio_runtime_tests.py::test_web_console_recovers_after_service_restart
+          service-tester/studio_runtime_tests.py::test_console_opens_selected_profile_details
+          service-tester/studio_runtime_tests.py::test_console_settings_and_timezone_choices_preserve_saved_values
+          -q --timeout=240
       - name: Show failed KasmVNC build diagnostics
         if: failure()
         run: |

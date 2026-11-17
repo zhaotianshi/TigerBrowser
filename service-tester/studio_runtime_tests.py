@@ -271,7 +271,10 @@ async def console_login(page, origin):
     await page.goto(origin)
     await page.locator('.login-form').get_by_label('用户名', exact=True).fill('root')
     await page.locator('.login-form').get_by_label('密码', exact=True).fill('synthetic-admin-password')
-    await page.get_by_role('button', name='登录控制台', exact=True).click()
+    async with page.expect_response(lambda response: response.url == origin + '/team/v1/login'
+                                    and response.request.method == 'POST') as login_response:
+        await page.get_by_role('button', name='登录控制台', exact=True).click()
+    assert (await login_response.value).ok
     await expect(page.locator('.connection-status')).to_have_text('实时同步 · 正常')
 
 
@@ -299,6 +302,22 @@ async def test_web_console_recovers_after_service_restart(workspace, tmp_path):
             await page.get_by_role('button', name='退出', exact=True).click()
             await expect(page.locator('.login-page')).to_be_visible()
             await expect(page.locator('.workspace-main')).to_be_hidden()
+
+
+@pytest.mark.asyncio
+async def test_console_opens_selected_profile_details(workspace, tmp_path):
+    store, _, _, profile = workspace
+    async with running_team(store) as (_, origin), console_client(store, tmp_path / 'client') as page:
+        await console_login(page, origin)
+        row = page.locator('.profile-table tbody tr').filter(has_text=profile['name'])
+        await row.get_by_role('checkbox').check()
+        await page.get_by_role('button', name='详情', exact=True).click()
+        modal = page.locator('.modal-container').filter(has_text='环境详情与指纹检查')
+        await expect(modal.get_by_text(profile['id'], exact=True)).to_be_visible()
+        await expect(modal.get_by_text(profile['name'], exact=True)).to_be_visible()
+        await modal.get_by_role('button', name='确定', exact=True).click()
+        await row.get_by_role('button', name=profile['name'], exact=True).click()
+        await expect(modal.get_by_text(profile['id'], exact=True)).to_be_visible()
 
 
 @pytest.mark.asyncio
