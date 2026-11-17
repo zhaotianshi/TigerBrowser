@@ -7,6 +7,7 @@ import subprocess
 import sys
 from importlib.metadata import distributions, version
 from pathlib import Path
+from tempfile import mkdtemp
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALL = '/opt/tigerbrowser-client'
@@ -87,12 +88,36 @@ def windows_installer(app: Path, output: Path, name: str, client_version: str, i
 def macos_image(dist: Path, output: Path, name: str):
     app = dist / 'TigerBrowser.app'
     subprocess.run([str(app / 'Contents/MacOS/TigerBrowser'), '--check-runtime'], check=True)
-    image = output / 'image'
-    image.mkdir()
-    shutil.move(app, image / app.name)
-    (image / 'Applications').symlink_to('/Applications')
-    subprocess.run(['hdiutil', 'create', '-volname', 'TigerBrowser', '-srcfolder', str(image),
-                    '-format', 'UDZO', str(output / name)], check=True)
+    staging = Path(mkdtemp(prefix='dmg-', dir=output))
+    mount = staging / 'volume'
+    mount.mkdir()
+    image = staging / 'staging.sparseimage'
+    size_kib = int(subprocess.check_output(['du', '-A', '-sk', str(app)], text=True).split()[0])
+    # Sparse capacity leaves room for HFS+ metadata without reserving that space on disk.
+    subprocess.run(['hdiutil', 'create', '-type', 'SPARSE', '-fs', 'HFS+',
+                    '-volname', 'TigerBrowser', '-size', f'{max(32 * 1024, 2 * size_kib)}k',
+                    str(image)], check=True)
+    try:
+        subprocess.run(['hdiutil', 'attach', '-nobrowse', '-noautoopen', '-owners', 'off',
+                        '-mountpoint', str(mount), str(image)], check=True)
+        if not mount.is_mount():
+            raise RuntimeError('The macOS staging volume was not mounted at its private path.')
+        mounted_app = mount / app.name
+        subprocess.run(['ditto', '--rsrc', '--extattr', '--acl', str(app), str(mounted_app)], check=True)
+        (mount / 'Applications').symlink_to('/Applications')
+        subprocess.run(['codesign', '--verify', '--deep', '--strict', str(mounted_app)], check=True)
+        subprocess.run(['sync'], check=True)
+    finally:
+        if mount.is_mount():
+            # Background macOS readers can hold the staging volume open after copying.
+            subprocess.run(['hdiutil', 'detach', str(mount), '-force'], check=True)
+    destination = output / name
+    subprocess.run(['hdiutil', 'convert', str(image), '-format', 'UDZO', '-o', str(destination)], check=True)
+    subprocess.run(['hdiutil', 'verify', str(destination)], check=True)
+    image.unlink()
+    if mount.exists():
+        mount.rmdir()
+    staging.rmdir()
 
 
 def debian_package(app: Path, output: Path, name: str, client_version: str):
